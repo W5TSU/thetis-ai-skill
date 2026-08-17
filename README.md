@@ -48,13 +48,42 @@ itself.
 
 ## Build
 
-A prebuilt `thetisctl` binary (linux/amd64) is committed at the repo root,
-so on a matching machine you can skip straight to step 4. **This binary is
-an ELF executable and will not run on Windows or macOS** — on those
-platforms (or after pulling a source change on Linux), rebuild from source
-with steps 1–3 below; step 3 is identical on every platform since the code
-is pure Go, it just produces a `thetisctl.exe`/Mach-O binary instead of an
-ELF one:
+Every push of a `v*` tag builds Linux, Windows, and macOS (amd64 + arm64)
+binaries via [GitHub Actions](.github/workflows/release.yml) and publishes
+them to [Releases](https://github.com/W5TSU/thetis-ai-skill/releases) —
+download one there, or build from source yourself.
+
+### Option A: download a prebuilt binary
+
+1. Grab the file for your platform from the
+   [latest release](https://github.com/W5TSU/thetis-ai-skill/releases/latest):
+   `thetisctl-linux-amd64`, `thetisctl-windows-amd64.exe`,
+   `thetisctl-darwin-amd64` (Intel Mac), or `thetisctl-darwin-arm64` (Apple
+   Silicon). A `SHA256SUMS` file is published alongside them if you want to
+   verify the download.
+2. **Linux/macOS** — make it executable and symlink it onto `PATH`:
+   ```bash
+   chmod +x thetisctl-linux-amd64     # or your platform's filename
+   sudo ln -sf "$(pwd)/thetisctl-linux-amd64" /usr/local/bin/thetisctl
+   ```
+3. **Windows (PowerShell)** — `%LOCALAPPDATA%\Microsoft\WindowsApps` is on
+   every user's `PATH` by default; creating a symlink there needs Developer
+   Mode on (Settings → Privacy & Security → For developers) or an elevated
+   prompt:
+   ```powershell
+   New-Item -ItemType SymbolicLink `
+     -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\thetisctl.exe" `
+     -Target "C:\path\to\thetisctl-windows-amd64.exe"
+   ```
+   Without Developer Mode, add the folder containing the `.exe` to your
+   `PATH` instead (System Properties → Environment Variables) rather than
+   symlinking.
+4. **Verify:**
+   ```bash
+   thetisctl help
+   ```
+
+### Option B: build from source
 
 1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
    — builds anywhere Go runs).
@@ -63,26 +92,18 @@ ELF one:
    git clone https://github.com/W5TSU/thetis-ai-skill.git
    cd thetis-ai-skill
    ```
-3. **Build the binary:**
+3. **Build:**
    ```bash
    go build -o thetisctl ./cmd/thetisctl
    ```
-4. **(Optional) put it on your `PATH`** — symlink rather than move, since
-   `thetisctl` is a tracked file in this repo (Linux/macOS shown; on
-   Windows, add the repo folder to `PATH` instead, or reference
-   `thetisctl.exe` by full path):
-   ```bash
-   sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
-   ```
-5. **Verify it runs:**
-   ```bash
-   ./thetisctl help
-   ```
+4. Put it on `PATH` the same way as Option A step 2/3, pointing at this
+   binary instead of a downloaded one.
 
-That's the whole build — no package manager, no runtime dependencies, no
-Thetis-side install (both servers already ship in Thetis; see below to turn
-them on). Optionally run `go vet ./...` and `go test ./...` first if you
-want the code-quality/unit-test checks to pass before you rely on it.
+Either way there's no package manager and no runtime dependencies, and no
+Thetis-side install is needed (both servers already ship in Thetis; see
+below to turn them on). Optionally run `go vet ./...` and `go test ./...`
+after building from source if you want the code-quality/unit-test checks to
+pass before you rely on it.
 
 ## Enabling the servers in Thetis
 

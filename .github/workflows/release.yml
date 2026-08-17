@@ -1,0 +1,67 @@
+name: Release
+
+# Cross-compiles thetisctl for Linux, Windows, and macOS from a single Linux
+# runner (pure Go, no cgo -- see AGENTS.md's Local Contracts -- so no native
+# Windows/macOS runner is needed just to produce their binaries) and, on a
+# version tag push, publishes them as GitHub Release assets alongside a
+# checksum file. workflow_dispatch lets the build+verify steps be exercised
+# by hand without cutting a real release.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Verify (gofmt, vet, unit tests)
+        run: |
+          test -z "$(gofmt -l .)" || { echo "gofmt -l found unformatted files:"; gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+
+      - name: Build all platform binaries
+        run: |
+          mkdir -p dist
+          build() {
+            local goos="$1" goarch="$2" ext="$3"
+            local out="dist/thetisctl-${goos}-${goarch}${ext}"
+            echo "building $out"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 \
+              go build -o "$out" ./cmd/thetisctl
+          }
+          build linux   amd64 ""
+          build windows amd64 ".exe"
+          build darwin  amd64 ""
+          build darwin  arm64 ""
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thetisctl-binaries
+          path: dist/*
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

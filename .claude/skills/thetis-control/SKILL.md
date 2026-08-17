@@ -36,13 +36,14 @@ transmit. Only bind on a trusted LAN; never expose either port to the
 internet (no reverse proxy, no port-forward, no VPN split-tunnel that leaks
 it).
 
-**Building the CLI.** A prebuilt `thetisctl` binary (linux/amd64) is already
-committed at the repo root, so on a matching machine there's nothing to
-build. **This binary is an ELF executable and will not run on Windows or
-macOS** — on those platforms (or after pulling a source change on Linux),
-rebuild it: pure Go, no cgo, no third-party dependencies, builds anywhere Go
-1.22+ runs, on whatever machine will invoke it (does not need to be the
-Windows box running Thetis):
+**Getting the CLI.** `.github/workflows/release.yml` cross-compiles
+`thetisctl` for Linux, Windows, and macOS (amd64 + arm64) from a single
+Linux runner (pure Go, no cgo — no native runner needed per platform) and
+publishes them to this repo's
+[Releases](https://github.com/W5TSU/thetis-ai-skill/releases) on every `v*`
+tag, alongside a `SHA256SUMS` file. Download the binary matching the
+machine that will run the skill, or build from source (identical on every
+platform since the code is pure Go):
 
 ```bash
 go build -o thetisctl ./cmd/thetisctl
@@ -52,16 +53,29 @@ go test ./...          # unit tests only; live_test.go files need a real radio, 
 
 **Task: link the binary onto `PATH`.** The skill invokes `thetisctl` as a
 bare command, so it must resolve on `PATH` for whichever user/agent runs it.
-From the repo root (Linux/macOS shown; on Windows, add the repo folder to
-`PATH` instead, or reference `thetisctl.exe` by full path):
 
-```bash
-sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
-```
+- **Linux/macOS:**
+  ```bash
+  chmod +x thetisctl-linux-amd64      # skip if built from source (already +x)
+  sudo ln -sf "$(pwd)/thetisctl-linux-amd64" /usr/local/bin/thetisctl
+  ```
+- **Windows (PowerShell)** — `%LOCALAPPDATA%\Microsoft\WindowsApps` is on
+  every user's `PATH` by default; creating a symlink there needs Developer
+  Mode on (Settings → Privacy & Security → For developers) or an elevated
+  prompt:
+  ```powershell
+  New-Item -ItemType SymbolicLink `
+    -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\thetisctl.exe" `
+    -Target "C:\path\to\thetisctl-windows-amd64.exe"
+  ```
+  Without Developer Mode, add the folder containing the `.exe` to `PATH`
+  instead (System Properties → Environment Variables) rather than
+  symlinking.
 
-Re-run this after rebuilding from source in place (the symlink target stays
-valid; only needed once per checkout location). Confirm with `which
-thetisctl` and `thetisctl help`.
+Re-run the relevant step after downloading a new release or rebuilding from
+source in place (the symlink target stays valid; only needed once per
+binary location). Confirm with `which thetisctl` (`Get-Command thetisctl`
+on Windows) and `thetisctl help`.
 
 **Installing the skill itself.** This `.claude/skills/thetis-control/`
 directory is a self-contained Claude Code skill. To make it available in
