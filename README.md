@@ -132,28 +132,6 @@ that looked "flat, broadband, no speech pauses" turned out to just be
 mistuned voice). Listen to the files yourself, or run them through actual
 FreeDV software, to confirm.
 
-## FreeDV Reporter spotting (`thetisctl freedv-reporter watch`)
-
-Watches [FreeDV Reporter](https://qso.freedv.org)'s live activity feed for stations
-starting to transmit within a frequency range, and — with `--tci` — automatically
-retunes Thetis's RX1 there. **Not TX-capable**: it only changes what Thetis is
-listening to, never keys anything, so it's safe to leave running unattended.
-
-| Flag | Effect |
-|---|---|
-| `--min-freq <hz>` / `--max-freq <hz>` | Frequency range to watch (default: 20m, 14000000–14350000) |
-| `--tci <ip>` [`--tci-port 50001`] | Auto-tune this Thetis instance's RX1 on activity |
-| `--mode <mode>` | Mode to set when auto-tuning (default `digu`) |
-
-```bash
-./thetisctl freedv-reporter watch                      # just print alerts, don't tune anything
-./thetisctl freedv-reporter watch --tci 192.168.1.50    # also auto-tune that Thetis's RX1
-```
-
-The reporter has no REST/JSON API — its live data is a Socket.IO v4 feed, confirmed
-by direct protocol probing (`internal/freedvreporter`, a hand-rolled client matching
-`internal/tci`'s existing no-third-party-dependency convention). Runs until Ctrl-C.
-
 ## Transmitting (TX-capable commands)
 
 `cat ptt`, `cat quickplay on`, `tci tune`, `tci ptt`, `tci cw send`, and `tci

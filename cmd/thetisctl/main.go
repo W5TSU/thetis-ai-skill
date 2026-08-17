@@ -21,8 +21,6 @@ func main() {
 		err = runCAT(os.Args[2:])
 	case "tci":
 		err = runTCI(os.Args[2:])
-	case "freedv-reporter":
-		err = runFreeDVReporter(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -46,8 +44,6 @@ trusted LAN, never the internet.
 Usage:
   thetisctl cat --host <ip> [--port 13013] [--timeout 3s] <command> [args...]
   thetisctl tci --host <ip> [--port 50001] [--timeout 5s] <command> [args...]
-  thetisctl freedv-reporter watch [--min-freq 14000000] [--max-freq 14350000]
-                                   [--tci <ip>] [--tci-port 50001] [--mode digu]
 
 CAT commands (control-only, Tier 1):
   freq get A|B                    freq set A|B <hz>
@@ -94,11 +90,5 @@ Every TX-capable command (ptt on, tune on, tx-audio send) defaults to a dry
 run: it prints what it would send and does nothing TX-capable. Real keying
 requires --confirm-tx equal to the exact phrase thetisctl prints in dry-run
 output. Read the safety protocol in SKILL.md before ever passing that flag.
-
-freedv-reporter watch: watches FreeDV Reporter's (qso.freedv.org) live feed
-for stations starting to transmit within a frequency range (default 20m,
-14.000-14.350 MHz). Prints an alert for each; with --tci, also retunes RX1
-there automatically (not TX-capable — this only changes what Thetis is
-listening to). Runs until Ctrl-C.
 `)
 }

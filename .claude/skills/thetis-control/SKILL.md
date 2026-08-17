@@ -1,6 +1,6 @@
 ---
 name: thetis-control
-description: "Remotely controls a running Thetis SDR transceiver via the thetisctl CLI over its CAT-over-TCP and TCI-over-WebSocket protocols — read/set VFO frequency, mode, filters, AGC, attenuator/preamp, band, RIT/XIT/split; capture or stream RX audio; scan FreeDV calling frequencies; watch FreeDV Reporter for activity; and, only with explicit per-transmission human confirmation, key the transmitter (PTT, TUNE, CW, TX audio, Quick Play, RADE sanity check). Use whenever the user wants to check or change a Thetis/HL2 station's state, capture RX audio, or transmit."
+description: "Remotely controls a running Thetis SDR transceiver via the thetisctl CLI over its CAT-over-TCP and TCI-over-WebSocket protocols — read/set VFO frequency, mode, filters, AGC, attenuator/preamp, band, RIT/XIT/split; capture or stream RX audio; scan FreeDV calling frequencies; and, only with explicit per-transmission human confirmation, key the transmitter (PTT, TUNE, CW, TX audio, Quick Play, RADE sanity check). Use whenever the user wants to check or change a Thetis/HL2 station's state, capture RX audio, or transmit."
 allowed-tools: Bash, Read
 ---
 
@@ -93,9 +93,6 @@ check with e.g. `thetisctl tci --host <radio-ip> query trx1`.
   Thetis's macro keyer, and TX audio file playback. Use this tier only when
   the task needs audio or CW/TX-audio, since it's the protocol that can
   actually carry transmitted audio.
-- **freedv-reporter** (`thetisctl freedv-reporter watch`) — watches the
-  external qso.freedv.org live feed and, with `--tci`, auto-retunes RX1.
-  Never transmits; safe to leave running unattended.
 
 Full flag/command tables for both tiers are in `README.md` — don't duplicate
 them here from memory; read that file for exact syntax before constructing a
@@ -209,5 +206,3 @@ Exact flags/syntax: `README.md`.
 `agc`, `agc-gain`, `drive`, `power`, `rx-audio capture|stream`,
 `freedv-scan`, `query <cmd>`, **`tune`**, **`ptt`**, **`cw send`**,
 **`tx-audio send`**.
-
-**freedv-reporter**: `watch` (never TX-capable).
