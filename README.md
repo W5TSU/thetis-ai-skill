@@ -23,7 +23,30 @@ directly. For the AI-agent workflow, deployment steps, and the full TX
 safety protocol, see
 [`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md).
 
-## Install
+## Install as an AI skill
+
+This repo doubles as a ready-to-use Claude Code skill
+(`.claude/skills/thetis-control/`) that lets an AI agent operate a Thetis
+radio through `thetisctl`, with the TX safety protocol built in. To install
+it:
+
+```bash
+# Project-local — drop it into a specific project:
+cp -r .claude/skills/thetis-control /path/to/your-project/.claude/skills/
+
+# Global — available in every project for this user:
+mkdir -p ~/.claude/skills
+cp -r .claude/skills/thetis-control ~/.claude/skills/
+```
+
+The skill assumes `thetisctl` is reachable on `PATH`, so build it first (see
+[Build](#build) below) and make sure the binary is installed before an agent
+tries to use the skill. Full skill behavior, deployment details, and the TX
+safety protocol live in
+[`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md)
+itself.
+
+## Build
 
 1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
    — builds anywhere Go runs).
@@ -45,7 +68,7 @@ safety protocol, see
    ./thetisctl help
    ```
 
-That's the whole install — no package manager, no runtime dependencies, no
+That's the whole build — no package manager, no runtime dependencies, no
 Thetis-side install (both servers already ship in Thetis; see below to turn
 them on). Optionally run `go vet ./...` and `go test ./...` first if you
 want the code-quality/unit-test checks to pass before you rely on it.
