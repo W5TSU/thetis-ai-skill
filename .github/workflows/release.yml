@@ -27,6 +27,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache: false # no go.sum -- this module has zero dependencies to cache
 
       - name: Verify (gofmt, vet, unit tests)
         run: |
