@@ -1,5 +1,7 @@
 # thetisctl
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > **⚠️ Only point this at a radio you directly control.** `thetisctl` can key
 > a real transmitter into a real antenna — its TX-capable commands cause
 > actual on-air RF, not a simulation. Only use it against a Thetis instance
