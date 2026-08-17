@@ -2,6 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+A Go CLI for remotely controlling a running Thetis SDR instance over its
+existing network protocols: CAT-over-TCP (frequency, mode, filters, VFO,
+RIT/XIT, split, AGC, attenuator/preamp, band) and TCI-over-WebSocket (the
+same controls plus RX/TX audio streaming, CW keying, and transmit). No
+Thetis-side code changes are required — both servers already exist in
+Thetis, they're just usually off by default.
+
 > **⚠️ Only point this at a radio you directly control.** `thetisctl` can key
 > a real transmitter into a real antenna — its TX-capable commands cause
 > actual on-air RF, not a simulation. Only use it against a Thetis instance
@@ -10,13 +17,6 @@
 > control protocols has authentication, so anything reachable on the network
 > is controllable — never run this against someone else's station, or point
 > it at an address you don't already trust, without their explicit consent.
-
-A Go CLI for remotely controlling a running Thetis SDR instance over its
-existing network protocols: CAT-over-TCP (frequency, mode, filters, VFO,
-RIT/XIT, split, AGC, attenuator/preamp, band) and TCI-over-WebSocket (the
-same controls plus RX/TX audio streaming, CW keying, and transmit). No
-Thetis-side code changes are required — both servers already exist in
-Thetis, they're just usually off by default.
 
 This file is a plain command reference for a human running `thetisctl`
 directly. For the AI-agent workflow, deployment steps, and the full TX
