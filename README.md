@@ -1,5 +1,14 @@
 # thetisctl
 
+> **⚠️ Only point this at a radio you directly control.** `thetisctl` can key
+> a real transmitter into a real antenna — its TX-capable commands cause
+> actual on-air RF, not a simulation. Only use it against a Thetis instance
+> you personally own or operate, are licensed to transmit from, and can
+> physically reach or shut down if something goes wrong. Neither of Thetis's
+> control protocols has authentication, so anything reachable on the network
+> is controllable — never run this against someone else's station, or point
+> it at an address you don't already trust, without their explicit consent.
+
 A Go CLI for remotely controlling a running Thetis SDR instance over its
 existing network protocols: CAT-over-TCP (frequency, mode, filters, VFO,
 RIT/XIT, split, AGC, attenuator/preamp, band) and TCI-over-WebSocket (the
@@ -11,6 +20,33 @@ This file is a plain command reference for a human running `thetisctl`
 directly. For the AI-agent workflow, deployment steps, and the full TX
 safety protocol, see
 [`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md).
+
+## Install
+
+1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
+   — builds anywhere Go runs).
+2. **Get the code:**
+   ```bash
+   git clone https://github.com/W5TSU/thetis-ai-skill.git
+   cd thetis-ai-skill
+   ```
+3. **Build the binary:**
+   ```bash
+   go build -o thetisctl ./cmd/thetisctl
+   ```
+4. **(Optional) put it on your `PATH`:**
+   ```bash
+   sudo mv thetisctl /usr/local/bin/
+   ```
+5. **Verify it runs:**
+   ```bash
+   ./thetisctl help
+   ```
+
+That's the whole install — no package manager, no runtime dependencies, no
+Thetis-side install (both servers already ship in Thetis; see below to turn
+them on). Optionally run `go vet ./...` and `go test ./...` first if you
+want the code-quality/unit-test checks to pass before you rely on it.
 
 ## Enabling the servers in Thetis
 
@@ -25,16 +61,6 @@ Open **Setup** in the Thetis instance you want to control and turn on:
 Neither server has authentication — anyone who can reach the bound
 address/port can issue any command, including keying the transmitter. Only
 bind these on a trusted LAN; never expose them to the internet.
-
-## Build
-
-```bash
-go build -o thetisctl ./cmd/thetisctl
-go vet ./...
-go test ./...
-```
-
-Pure Go, no cgo, no external dependencies — builds anywhere Go runs.
 
 ## Global flags
 
