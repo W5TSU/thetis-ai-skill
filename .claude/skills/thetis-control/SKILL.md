@@ -38,10 +38,11 @@ it).
 
 **Building the CLI.** A prebuilt `thetisctl` binary (linux/amd64) is already
 committed at the repo root, so on a matching machine there's nothing to
-build. For any other platform, or after pulling a source change, rebuild it
-— pure Go, no cgo, no third-party dependencies, builds anywhere Go 1.22+
-runs, on whatever machine will invoke it (does not need to be the Windows
-box running Thetis):
+build. **This binary is an ELF executable and will not run on Windows or
+macOS** — on those platforms (or after pulling a source change on Linux),
+rebuild it: pure Go, no cgo, no third-party dependencies, builds anywhere Go
+1.22+ runs, on whatever machine will invoke it (does not need to be the
+Windows box running Thetis):
 
 ```bash
 go build -o thetisctl ./cmd/thetisctl
@@ -51,7 +52,8 @@ go test ./...          # unit tests only; live_test.go files need a real radio, 
 
 **Task: link the binary onto `PATH`.** The skill invokes `thetisctl` as a
 bare command, so it must resolve on `PATH` for whichever user/agent runs it.
-From the repo root:
+From the repo root (Linux/macOS shown; on Windows, add the repo folder to
+`PATH` instead, or reference `thetisctl.exe` by full path):
 
 ```bash
 sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
