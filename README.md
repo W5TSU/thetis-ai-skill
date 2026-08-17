@@ -48,6 +48,10 @@ itself.
 
 ## Build
 
+A prebuilt `thetisctl` binary (linux/amd64) is committed at the repo root,
+so on a matching machine you can skip straight to step 4. Rebuild it
+yourself for any other platform, or after pulling a source change:
+
 1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
    — builds anywhere Go runs).
 2. **Get the code:**
@@ -59,9 +63,10 @@ itself.
    ```bash
    go build -o thetisctl ./cmd/thetisctl
    ```
-4. **(Optional) put it on your `PATH`:**
+4. **(Optional) put it on your `PATH`** — symlink rather than move, since
+   `thetisctl` is a tracked file in this repo:
    ```bash
-   sudo mv thetisctl /usr/local/bin/
+   sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
    ```
 5. **Verify it runs:**
    ```bash

@@ -1,7 +1,7 @@
-# Local `go build ./cmd/thetisctl` output -- this module's binary shares its
-# name with the module (go.mod: `module thetisctl`), so `go build` with no
-# `-o` drops a `thetisctl` executable right here.
-/thetisctl
+# /thetisctl (linux/amd64) is intentionally committed as a prebuilt binary so
+# users don't have to build from source -- see README's Build section. Only
+# the Windows cross-build output stays ignored, since that one isn't
+# committed.
 /thetisctl.exe
 
 # Other common local Go build/test artifacts, in case they ever show up here.

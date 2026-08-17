@@ -36,9 +36,12 @@ transmit. Only bind on a trusted LAN; never expose either port to the
 internet (no reverse proxy, no port-forward, no VPN split-tunnel that leaks
 it).
 
-**Building the CLI.** Pure Go, no cgo, no third-party dependencies — builds
-anywhere Go 1.22+ runs, on whatever machine will invoke it (does not need to
-be the Windows box running Thetis):
+**Building the CLI.** A prebuilt `thetisctl` binary (linux/amd64) is already
+committed at the repo root, so on a matching machine there's nothing to
+build. For any other platform, or after pulling a source change, rebuild it
+— pure Go, no cgo, no third-party dependencies, builds anywhere Go 1.22+
+runs, on whatever machine will invoke it (does not need to be the Windows
+box running Thetis):
 
 ```bash
 go build -o thetisctl ./cmd/thetisctl
@@ -46,8 +49,17 @@ go vet ./...
 go test ./...          # unit tests only; live_test.go files need a real radio, see AGENTS.md
 ```
 
-Put the resulting `thetisctl` binary somewhere on `PATH` (or reference it by
-absolute path) on the machine the agent runs on.
+**Task: link the binary onto `PATH`.** The skill invokes `thetisctl` as a
+bare command, so it must resolve on `PATH` for whichever user/agent runs it.
+From the repo root:
+
+```bash
+sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
+```
+
+Re-run this after rebuilding from source in place (the symlink target stays
+valid; only needed once per checkout location). Confirm with `which
+thetisctl` and `thetisctl help`.
 
 **Installing the skill itself.** This `.claude/skills/thetis-control/`
 directory is a self-contained Claude Code skill. To make it available in
