@@ -49,8 +49,12 @@ itself.
 ## Build
 
 A prebuilt `thetisctl` binary (linux/amd64) is committed at the repo root,
-so on a matching machine you can skip straight to step 4. Rebuild it
-yourself for any other platform, or after pulling a source change:
+so on a matching machine you can skip straight to step 4. **This binary is
+an ELF executable and will not run on Windows or macOS** — on those
+platforms (or after pulling a source change on Linux), rebuild from source
+with steps 1–3 below; step 3 is identical on every platform since the code
+is pure Go, it just produces a `thetisctl.exe`/Mach-O binary instead of an
+ELF one:
 
 1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
    — builds anywhere Go runs).
@@ -64,7 +68,9 @@ yourself for any other platform, or after pulling a source change:
    go build -o thetisctl ./cmd/thetisctl
    ```
 4. **(Optional) put it on your `PATH`** — symlink rather than move, since
-   `thetisctl` is a tracked file in this repo:
+   `thetisctl` is a tracked file in this repo (Linux/macOS shown; on
+   Windows, add the repo folder to `PATH` instead, or reference
+   `thetisctl.exe` by full path):
    ```bash
    sudo ln -sf "$(pwd)/thetisctl" /usr/local/bin/thetisctl
    ```
