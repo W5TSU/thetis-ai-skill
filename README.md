@@ -129,6 +129,12 @@ Both `cat` and `tci` take:
 | `--port <n>` | `13013` (cat) / `50001` (tci) | Server port |
 | `--timeout <duration>` | `3s` (cat) / `5s` (tci) | Network read/write timeout |
 
+The two tables below cover every command `thetisctl` currently implements.
+For the full universe of commands each protocol *defines* — including the
+~470 CAT/TCI commands `thetisctl` doesn't wire yet, and which ones are
+reachable via `tci query` in the meantime — see
+[`PROTOCOLS.md`](PROTOCOLS.md).
+
 ## CAT commands — control only (`thetisctl cat ...`)
 
 | Command | Effect |
@@ -151,14 +157,16 @@ Both `cat` and `tci` take:
 | `power on\|off` | Start/stop Thetis's radio engine — the main Power button, **not mains power** to the HL2 board |
 | `quickplay get` | Read whether Quick Play is active |
 | `quickplay off` | Stop Quick Play (always safe, no confirmation needed) |
-| `quickplay on` | **TX-capable** — see [Transmitting](#transmitting-tx-capable-commands); injects `Music\Thetis\quickrecord\SDRQuickAudio.wav` as RX I/Q ahead of the antenna, which is how FreeDV decode tests can be triggered remotely, but the underlying Thetis function can also key MOX for real — see [Notes](#notes-on-real-world-behavior) |
+| `quickplay on` | **TX-capable** — see [Transmitting](#transmitting-tx-capable-commands); injects `Music\Thetis\quickrecord\SDRQuickAudio.wav` as RX I/Q ahead of the antenna, which is how FreeDV/RADE decode tests can be triggered remotely, but the underlying Thetis function can also key MOX for real — see [`NOTES.md`](NOTES.md) |
 | `quickrec get` | Read whether Quick Rec is active |
 | `quickrec on\|off` | Quick Rec: record RX audio to that same fixed file |
-| `freedv get` | Read whether FreeDV RX decode is enabled |
+| `freedv get\|on\|off` | Enable/disable/read FreeDV RX decode (`fdv.c`), RX1 only |
+| `freedv status` | Read FreeDV sync + SNR — read-only, e.g. `SYNC  SNR 15.3 dB` or `no sync` |
+| `radae get\|on\|off` | Enable/disable/read RADE V1 RX decode, RX1 only |
+| `radae status` | Read RADE sync + SNR — read-only, same format as `freedv status` |
+| `radae-sanity` | **TX-capable** — see [Transmitting](#transmitting-tx-capable-commands); scripts a full RADE off-air sanity check (tune, enable decode, inject a bench test signal via Quick Play, poll sync/SNR, clean up) and prints a summary — see [`NOTES.md`](NOTES.md) |
 | `tciserver get` | Read whether Thetis's TCI server is listening |
 | `tciserver on\|off` | Enable/disable the TCI server — works even when TCI itself is unreachable (CAT doesn't depend on it being up), so it can bootstrap TCI back on after a restart left the Setup checkbox unchecked |
-| `freedv on\|off` | Enable/disable FreeDV RX decode (`fdv.c`), RX1 only |
-| `freedv status` | Read FreeDV sync + SNR — read-only, e.g. `SYNC  SNR 15.3 dB` or `no sync` |
 | `status` | Rig ID + frequency/mode/RIT/XIT/split/TX in one call |
 | `version` | Software version string, incl. the git short SHA the running build was made from (`ZZZV`) — verifies which commit a remote instance is actually running |
 | `query <CODE>` | Raw passthrough for any CAT command without a dedicated wrapper (e.g. `query ZZZV`) |
@@ -217,10 +225,10 @@ FreeDV software, to confirm.
 
 ## Transmitting (TX-capable commands)
 
-`cat ptt`, `cat quickplay on`, `tci tune`, `tci ptt`, `tci cw send`, and `tci
-tx-audio send` can key the transmitter. **Every one of them defaults to a dry
-run** — without `--confirm-tx`, they print exactly what they would send and
-do nothing TX-capable:
+`cat ptt`, `cat quickplay on`, `cat radae-sanity`, `tci tune`, `tci ptt`,
+`tci cw send`, and `tci tx-audio send` can key the transmitter. **Every one
+of them defaults to a dry run** — without `--confirm-tx`, they print exactly
+what they would send and do nothing TX-capable:
 
 ```
 $ ./thetisctl tci --host 192.168.1.50 cw send 0 "CQ CQ DE W5TSU" --speed 5 --mode cwu
@@ -245,153 +253,36 @@ Other TX flags:
 | `--max-duration <duration>` (default `10s` for tx-audio, `90s` for cw) | `tci tx-audio send`, `tci cw send` | Hard cap; truncates/stops and unkeys if exceeded |
 
 Every TX-capable command unkeys automatically on completion, error, or
-Ctrl-C, and — as of a fix made after a real incident, see below —
-**verifies** the unkey actually took effect (retrying if not) rather than
-firing the command once and trusting it worked.
-
-**Unkeying is confirmed, not fire-and-forget.** Earlier versions of every
-TX-capable command sent their unkey and closed the connection immediately
-afterward; against a real radio this was shown to sometimes silently drop
-the command, leaving the radio keyed with no time bound until a human
-noticed. Every unkey now sends, then queries the radio's actual state and
-retries until confirmed (or reports an error — never silent success). `tci
-tune` additionally hard-caps total on-time at 5 seconds no matter what
-`--hold` requests, since a bare unmodulated carrier is the highest-nuisance
-thing this tool can transmit if left running.
+Ctrl-C, and **verifies** the unkey actually took effect (retrying if not)
+rather than firing the command once and trusting it worked — a real prior
+incident showed a bare fire-and-forget unkey can silently fail; see
+[`NOTES.md`](NOTES.md#unkeying-is-confirmed-not-fire-and-forget). `tci tune`
+additionally hard-caps total on-time at 5 seconds no matter what `--hold`
+requests.
 
 ## Live tests
 
-Four files, all build-tag `live` (excluded from `go test ./...` and CI):
+`go test ./...` only runs unit tests. Round-tripping every command against a
+real Thetis instance needs the `live` build tag and a few env vars — see
+[`AGENTS.md`'s Verification section](AGENTS.md#verification) for the exact
+commands, which files they cover, and the separate opt-in required to
+actually key the transmitter (`txlive_test.go`) — not something an AI agent
+should ever run unprompted; see `SKILL.md`'s safety protocol.
 
-| File | Covers |
-|---|---|
-| `internal/cat/live_test.go` | Every exported CAT client function |
-| `internal/tci/live_test.go` | Every exported TCI client function |
-| `cmd/thetisctl/live_test.go` | CLI-layer code the library tests bypass: `rx-audio capture`/`stream`, `query`, and a dry run of every TX-capable command |
-| `cmd/thetisctl/txlive_test.go` | **Opt-in only** — actually keys the transmitter for real; see below |
+## Known gotchas
 
-```bash
-THETIS_HOST=192.168.2.12 go test -tags=live ./internal/cat/... -v
-THETIS_HOST=192.168.2.12 go test -tags=live ./internal/tci/... -v
-THETIS_HOST=192.168.2.12 go test -tags=live ./cmd/thetisctl/... -v
-```
+A few headliners — the full incident history and root-cause writeups are in
+[`NOTES.md`](NOTES.md):
 
-Every settable function is round-tripped (read → change → verify → restore
-original) rather than asserting a fixed value. The first three files never
-transmit for real — TX-capable functions/commands are only ever exercised in
-their safe form (`SetPTT`/`SetTrx`/`SetTune` called with `false`; CLI
-dry-runs with no `--confirm-tx`). See the test file doc comments for
-exceptions (e.g. `SetBand` is read-only in the test; preamp attenuation is
-quantized, not continuous — see below).
-
-**`txlive_test.go` actually transmits.** It requires a *second*, independent
-env var beyond `THETIS_HOST`, set to the exact confirm phrase, or every test
-in it skips:
-
-```bash
-THETIS_HOST=192.168.2.12 THETIS_LIVE_ALLOW_TX=I-UNDERSTAND-THIS-KEYS-THE-RADIO \
-    go test -tags=live ./cmd/thetisctl/... -run TestLiveTX -v
-```
-
-Run this yourself, deliberately, when you want real end-to-end TX
-regression coverage — it's not something an AI agent should ever run
-unprompted; see `SKILL.md`'s safety protocol.
-
-## Notes on real-world behavior
-
-- **`version`'s build date field can show garbled text on some machines —
-  a pre-existing cosmetic bug, not something `version`/`query` introduced.**
-  `VersionInfo.BuildDate` is generated by a `wmic os get localdatetime`
-  parse in `Thetis.csproj`'s pre-build event, which assumes a fixed locale
-  date format; on at least one real Windows instance this produced
-  `(~4,2/~6,2/~2,2)` instead of a real date. The **git SHA** portion
-  (`git:<sha>`, added 2026-08-07 specifically so a remote build's exact
-  commit can be verified) is unaffected — it comes from a separate
-  `git rev-parse --short HEAD` call in the same pre-build step.
-- **`quickplay on` can key MOX for real — discovered by live testing
-  2026-08-04, previously undocumented and previously ungated.** Quick Play
-  was designed and documented (including earlier in this file) as an
-  RX-only bench-test feature: it injects a wav as RX I/Q ahead of the
-  antenna input, bypassing the antenna entirely. In practice it calls
-  Thetis's `PlayFileViaWDSP` (`Console/clsAudioRecordPlayback.cs`), a
-  function *shared* with a genuine TX-audio-preview feature, which contains
-  `if (!_console.MOX && MoxOnPlayback) _console.MOX = true;` —
-  and `MoxOnPlayback` **defaults to `true`** in this codebase, set via
-  Setup → Recording's "MOX on Playback" checkbox. Before this was caught,
-  `quickplay on` went through `catToggle` exactly like `quickrec` or
-  `freedv`, with no TX gate at all — every call could have kept MOX on,
-  completely bypassing `--confirm-tx`. `quickplay on` is now treated as
-  TX-capable (see [Transmitting](#transmitting-tx-capable-commands));
-  `quickrec` was checked and confirmed to have no equivalent MOX side
-  effect (`RecordToFileFromWDSP` never touches `_console.MOX`), so it
-  stays ungated. If you need Quick Play to be genuinely RX-only, confirm
-  "MOX on Playback" is unchecked in Thetis's Setup → Recording tab — this
-  tool cannot read or change that setting remotely, only the resulting MOX
-  state.
-- **Split routes TX to VFO B's frequency, not VFO A's — check it before
-  transmitting.** If split is enabled, everything you've set on VFO A
-  (frequency, mode) stays displayed correctly, but the radio actually
-  transmits on VFO B's frequency instead. This caused a real incident: a
-  test session transmitted on a different band than intended because split
-  had been on since before the session started, and nothing in routine
-  `status` output made that obvious. Check TCI's `query tx_frequency`
-  against VFO A before transmitting if split state is unknown.
-- **CAT connect banner.** If Thetis's "Send Welcome" option is on, connecting
-  to the CAT port gets you an unsolicited `#Thetis TCP/IP Cat - <version>#;`
-  line before any command reply. `thetisctl` already accounts for this.
-- **CW completion isn't a "message finished" event.** Thetis's TCI protocol
-  has no such event for a plain `cw_macros` send (`cw_macros_empty` only
-  fires in CW Terminal mode, which `cw send` doesn't use). `cw send` instead
-  polls live PTT state and reports done once it sees the radio key up and
-  then release.
-- **Switching to CW mode** can shift the displayed/tuned frequency by
-  Thetis's CW pitch offset (commonly 600 Hz) — this is normal sidetone-offset
-  behavior, not a bug in `thetisctl`.
-- **The classic Kenwood `PS` (power) CAT command is a disabled stub** — use
-  `power` (which wraps the real, active `ZZPS`/TCI `start;`/`stop;`
-  commands) instead.
-- **A fully-implemented CAT command can still be unreachable.** `quickplay`/
-  `quickrec`'s underlying `ZZQA`/`ZZQB` had complete, correct
-  implementations in Thetis's `CATCommands.cs` that were simply never
-  wired into the dispatch switch or given a `CATStructs.xml` entry — no CAT
-  client, this tool included, could reach them until that was fixed
-  (2026-07-30). Worth remembering if a command that looks fully implemented
-  in source still doesn't respond over the wire.
-- **`freedv on|off|status` (`ZZDV`/`ZZDS`) is new, not revived** — added
-  2026-07-30 specifically to make FreeDV RX decode testing (`fdv.c`, still
-  under active development on the FreeDV branch) scriptable without a human
-  watching the Setup DSP tab: `freedv on`, `quickplay on --confirm-tx=...`
-  to inject the bench test signal (see the MOX-on-playback note above —
-  this is TX-capable), then `freedv status` for an objective sync/SNR
-  readout.
-  `ZZFD`/`ZZFS` were already taken by unrelated existing commands (FM
-  deviation, RX2 filter low) — a real near-miss caught only because CI
-  failed to compile (`CS0111: already defines a member`), a good reminder
-  to grep for an unused code before claiming one, the same way `quickplay`/
-  `quickrec`'s revival required checking `ZZQA`/`ZZQB` weren't already live.
-- **TCI's initial-state burst can shadow a reply right after connect.** If
-  "send initial state on connect" is on, Thetis pushes ~100+ unsolicited
-  status frames (ending in a `ready;` sentinel) immediately after the
-  WebSocket handshake. A request issued too early can match a stale value
-  from that burst instead of the genuine reply — this was a real bug in `tci
-  query`'s raw passthrough (fixed: it now matches replies by command name
-  instead of taking whichever frame arrives first; see `tciQuery`'s doc
-  comment for the residual ambiguity that fix can't fully resolve) and was
-  also hit by the live test suite's own query helper (see
-  `drainInitialBurst` in `internal/tci/live_test.go`).
-- **Preamp attenuation is quantized, not continuous.** Both CAT's `ZZPA` and
-  TCI's `rx_preamp_att_ex` resolve to a small set of discrete steps (0, -10,
-  -20, -30, -40, -50 dB, plus SA-prefixed variants) server-side — an
-  in-between value gets silently snapped to the nearest step.
-- **CAT's `atten get` (`ZZRX` query) can hang indefinitely on a live,
-  actively-receiving radio — but `atten set` doesn't.** Independent of
-  `power` state; confirmed `SetAttenuatorDB` always returns instantly (it's
-  fire-and-forget over CAT and never waits for a reply) while `GetAttenuatorDB`
-  hangs. Suspected cause: an automatic overload-protection feature was
-  observed changing the equivalent TCI value (`rx_step_att_ex`) on its own in
-  real time, possibly saturating the UI-thread queue the CAT getter blocks
-  on. Unconfirmed — if you hit this, cross-check via TCI (`tci atten <rx>
-  ...`) before assuming `thetisctl` is at fault.
+- **Split routes TX to VFO B's frequency, not VFO A's.** Check before
+  transmitting if split state is unknown.
+- **`quickplay on` (and anything that reuses it, like `radae-sanity`) can
+  key MOX for real**, not just inject RX I/Q — depends on a Thetis setting
+  this tool can't read remotely.
+- **Preamp attenuation is quantized** to a small set of discrete dB steps,
+  not continuous.
+- **CAT's `atten get` can hang** on a live, actively-receiving radio, while
+  `atten set` never does.
 
 ## Extending thetisctl
 
