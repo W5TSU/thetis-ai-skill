@@ -165,7 +165,7 @@ frequency, mode, message content (for CW), and duration. Rules:
   clearance to transmit.
 
 **Known gotchas to check before confirming a real transmission** (details
-and incident history in `README.md`'s "Notes on real-world behavior"):
+and incident history in [`NOTES.md`](../../../NOTES.md)):
 
 - **Split routes TX to VFO B, not VFO A.** If split is on, the radio
   transmits on VFO B's frequency even though VFO A displays/reads back
@@ -227,7 +227,8 @@ Exact flags/syntax: `README.md`.
 **CAT** (`thetisctl cat --host <ip> ...`): `freq get|set`, `mode get|set`,
 `rit`, `xit`, `split`, `agc`, `atten`, `preamp`, `band`, `power`,
 `quickplay get|off` / **`quickplay on`**, `quickrec`, `freedv`, `radae`,
-**`radae-sanity`**, `status`, `version`, `query <code>`, **`ptt`**.
+`tciserver`, **`radae-sanity`**, `status`, `version`, `query <code>`,
+**`ptt`**.
 
 **TCI** (`thetisctl tci --host <ip> ...`): `vfo`, `modulation`, `split`,
 `rit`, `xit`, `rit-offset`, `xit-offset`, `filter`, `atten`, `preamp`,

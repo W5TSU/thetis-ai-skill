@@ -90,4 +90,11 @@ go-ahead required for `--confirm-tx` itself; see
 
 ## Child DOX Index
 
-None.
+- `PROTOCOLS.md` — exhaustive TCI/CAT command inventory generated from the
+  upstream TCI spec and Thetis's own CAT source, with an implemented-vs-not
+  breakdown; regenerate it (steps included) after a Thetis sync that touches
+  CAT/TCI dispatch.
+- `NOTES.md` — real-world behavior notes and incident history (split out of
+  `README.md` to keep that a plain command reference); add to it, don't
+  duplicate back into `README.md`, when a new gotcha is confirmed against a
+  real radio.
