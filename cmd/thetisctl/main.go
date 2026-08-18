@@ -65,6 +65,11 @@ CAT commands (control-only, Tier 1):
                                    (scripted off-air sanity check: radae on, quickplay on, poll status, summarize)
   status
   ptt on --confirm-tx=<phrase> [--hold 3s]     ptt off
+  tune on --confirm-tx=<phrase> [--hold 3s]    tune off  (bare carrier via ZZTU — capped at 5s total, like TCI's tune)
+  query <CODE>                    (raw read passthrough, e.g. query ZZZV)
+  set <CODE> [params...]          (raw write passthrough for anything not above; refuses TX/RX/ZZTX/ZZTU — use ptt/tune)
+  zz list [prefix]                (list every registered ZZxx extended command, optionally filtered by prefix)
+  zz get <CODE>                   zz set <CODE> <value>   (validated get/set for ~200 registered ZZxx commands — see PROTOCOLS.md)
 
 TCI commands (control + audio + transmit, Tier 2; rx: 0=RX1, 1=RX2):
   vfo <rx> <chan 0|1> <hz>
@@ -84,9 +89,29 @@ TCI commands (control + audio + transmit, Tier 2; rx: 0=RX1, 1=RX2):
   freedv-scan [--dwell 6s] [--out-dir <dir>]  (RX-only: tunes RX1 through FreeDV calling frequencies, records + peak/RMS per band)
   tx-audio send <rx> --file tone.wav --confirm-tx=<phrase> [--max-duration 10s] [--sample-type int16]
   cw send <rx> "<text>" --confirm-tx=<phrase> [--speed 20] [--max-duration 90s]
+  cw send-msg <rx> <prefix|_> <callsign> <suffix> --confirm-tx=<phrase> [--speed 20] [--max-duration 90s]
+  cw edit-callsign <callsign>     cw speed-up <wpm>   cw speed-down <wpm>   cw delay <ms>   cw terminal <rx> on|off
+  dds <rx> <hz>                   (panorama/DDS center — moves VFO with it)
+  if-offset <rx> <chan 0|1> <offsetHz>   (VFO frequency as an offset from DDS center)
+  rx-enable <rx> on|off           (RX2 only — RX1 is always enabled)
+  rx-channel <rx> <chan 0|1> on|off
+  iq capture <rx> --duration 10s --out capture.wav   (always float32 — Thetis hard-codes IQ frame encoding)
+  iq stream <rx> --duration 10s      (raw float32 LE I/Q PCM to stdout)
+  iq-samplerate <hz>              (cosmetic on current Thetis — echoes back, doesn't retune hardware)
+  audio-samplerate <hz>           (8000|12000|24000|48000)
+  volume <db>                     mute on|off
+  sql <rx> on|off                 sql-level <rx> <-140..0 dB>
+  rx-mute <rx> on|off
+  rx-volume <rx> <chan 0|1> <-60..0 dB>       rx-balance <rx> <chan 0|1> <-40..40>
+  tune-drive <rx> <0-100>
+  rx-sensors on|off [--interval <ms>]         tx-sensors on|off [--interval <ms>]
+  nb <rx> on|off   bin <rx> on|off   nr <rx> on|off   anf <rx> on|off   apf <rx> on|off   nf <rx> on|off
+  spot send <callsign> <mode> <hz> <argb> [text]   spot delete <callsign>   spot clear
+  focus                           (bring Thetis's main window to the foreground)
   query <cmd> [args...]           (raw passthrough for anything not above)
 
-Every TX-capable command (ptt on, tune on, tx-audio send) defaults to a dry
+Every TX-capable command (cat/tci ptt on, cat/tci tune on, tx-audio send,
+cw send, cw send-msg, cat quickplay on, cat radae-sanity) defaults to a dry
 run: it prints what it would send and does nothing TX-capable. Real keying
 requires --confirm-tx equal to the exact phrase thetisctl prints in dry-run
 output. Read the safety protocol in SKILL.md before ever passing that flag.

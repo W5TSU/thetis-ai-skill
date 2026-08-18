@@ -17,6 +17,24 @@ silent success). `tci tune` additionally hard-caps total on-time at 5
 seconds no matter what `--hold` requests, since a bare unmodulated carrier
 is the highest-nuisance thing this tool can transmit if left running.
 
+## Generic command tables can hide TX-capable fields
+
+While building the `cat zz` generic get/set command for Thetis's ~320
+`ZZxx` extended CAT commands (2026-08-17), two — `ZZTX` ("MOX button") and
+`ZZTU` ("TUNE") — turned out to genuinely key the transmitter
+(`console.CATPTT` / `console.TUN` respectively) despite fitting the exact
+same plain-bool wire shape as ~75 harmless config toggles around them. Nothing
+about their two-line handler bodies looks different from e.g. `ZZCB`
+("Enable Break In") at a skim — the only way to catch it was reading what
+the handler actually *does*, not just how it parses its argument. Both are
+hard-excluded from the generic registry (`internal/cat/zzfields.go`) and
+from the raw `cat set` passthrough; `ZZTU` got a proper safety-gated
+`cat tune` command instead. Lesson for any future large-scale, table-driven
+command coverage (TCI or CAT): classifying by wire *shape* is necessary but
+not sufficient — every field still needs its handler body actually read
+before it's exposed generically, no matter how mechanical the rest of the
+batch looks.
+
 ## Other gotchas
 
 - **`version`'s build date field can show garbled text on some machines —

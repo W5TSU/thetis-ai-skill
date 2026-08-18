@@ -527,3 +527,19 @@ func (c *Client) SetPTT(on bool) error {
 	}
 	return c.Send("RX")
 }
+
+// SetTuneCAT keys (true) or unkeys (false) Thetis's TUNE (bare carrier) mode
+// via the Thetis-extended ZZTU command (CATCommands.cs's ZZTU, sets
+// console.TUN directly — the legacy Kenwood "AC"/tuner-status command is
+// unrelated). This transmits RF exactly like SetPTT — genuinely keys a real
+// transmitter — and is a raw wire action with no safety gating of its own;
+// callers (the thetisctl CLI) must apply the TX confirmation gate
+// (internal/safety) before calling this. Deliberately not exposed through
+// the generic SetZZ/zzFields registry (see zzfields.go's package doc) so it
+// can never be reached by an ungated passthrough.
+func (c *Client) SetTuneCAT(on bool) error {
+	if on {
+		return c.Set("ZZTU", "1")
+	}
+	return c.Set("ZZTU", "0")
+}

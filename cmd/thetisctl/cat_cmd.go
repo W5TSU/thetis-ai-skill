@@ -70,8 +70,14 @@ func runCAT(rawArgs []string) error {
 		return catVersion(c)
 	case "query":
 		return catQuery(c, args)
+	case "set":
+		return catSetRaw(c, args)
 	case "ptt":
 		return catPTT(c, args, a)
+	case "tune":
+		return catTune(c, args, a)
+	case "zz":
+		return catZZ(c, args)
 	default:
 		return fmt.Errorf("cat: unknown command %q", cmd)
 	}
@@ -424,6 +430,34 @@ func catQuery(c *cat.Client, args []string) error {
 	return nil
 }
 
+// catSetRaw is query's write-side counterpart: a raw passthrough for any CAT
+// set command without a dedicated wrapper. Unlike query, it is fire-and-
+// forget (most CAT sets aren't echoed — see Client.Set's doc comment) and
+// unlike TCI's query, it does not accept per-arg splitting, since CAT's wire
+// format has no delimiter between a code and its params ("<CODE><params>;",
+// not "<cmd>:<arg>,<arg>;") — args are joined with no separator. This is
+// TX-capable-command-agnostic passthrough: it does NOT route through
+// internal/safety, so it must never be used to send a raw TX command
+// (e.g. "set TX") — use the dedicated, safety-gated 'ptt' command instead.
+func catSetRaw(c *cat.Client, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("set: usage: set <CODE> [params...]  (e.g. set ZZAG 0150)")
+	}
+	code := strings.ToUpper(args[0])
+	if code == "TX" || code == "RX" {
+		return fmt.Errorf("set: %q keys/unkeys the transmitter — use 'thetisctl cat ptt on|off' instead, which applies the TX safety gate", code)
+	}
+	if code == "ZZTX" || code == "ZZTU" {
+		return fmt.Errorf("set: %q keys the transmitter (MOX/TUNE) — use 'thetisctl cat ptt on|off' or 'cat tune on|off' instead, which apply the TX safety gate", code)
+	}
+	params := strings.Join(args[1:], "")
+	if err := c.Set(code, params); err != nil {
+		return err
+	}
+	fmt.Printf("sent: %s%s\n", code, params)
+	return nil
+}
+
 func catStatus(c *cat.Client) error {
 	id, err := c.GetID()
 	if err != nil {
@@ -504,6 +538,152 @@ func catPTT(c *cat.Client, args []string, a parsedArgs) error {
 	default:
 		return fmt.Errorf("ptt: unknown value %q (want on|off)", args[0])
 	}
+}
+
+// tuneMaxHoldCAT and tuneUnkeyConfirmBudgetCAT mirror TCI's tune command:
+// TUNE is a bare, unmodulated carrier — the highest-nuisance thing this
+// tool can transmit if left running — so it gets a tighter, non-
+// configurable total on-time ceiling than plain PTT, regardless of --hold.
+const (
+	tuneMaxHoldCAT            = 3 * time.Second
+	tuneUnkeyConfirmBudgetCAT = 2 * time.Second
+)
+
+// catTune is CAT's TUNE-capable command via the Thetis-extended ZZTU code
+// (see SetTuneCAT's doc comment) — gates real keying behind the safety
+// confirmation phrase and always auto-unkeys, capped at 5s total (hold +
+// confirm) regardless of --hold, matching 'tci tune'.
+func catTune(c *cat.Client, args []string, a parsedArgs) error {
+	if len(args) != 1 {
+		return fmt.Errorf("tune: usage: tune on --confirm-tx=<phrase> [--hold 3s, capped at %s] | tune off", tuneMaxHoldCAT)
+	}
+	unkey := func() error {
+		return confirmCATUnkeyed(c, func() error { return c.SetTuneCAT(false) }, tuneUnkeyConfirmBudgetCAT)
+	}
+	switch args[0] {
+	case "off":
+		return unkey()
+	case "on":
+		hold := parseDuration(a.flag("hold", "3s"), 3*time.Second)
+		if hold > tuneMaxHoldCAT {
+			hold = tuneMaxHoldCAT
+		}
+		dec := safety.Check(a.flag("confirm-tx", ""))
+		if dec.DryRun {
+			fmt.Printf("[dry-run] would send: ZZTU1 ... (hold %s) ... ZZTU0\n", hold)
+			fmt.Println("Pass --confirm-tx=" + safety.ConfirmPhrase + " to actually key the transmitter.")
+			return nil
+		}
+		if err := c.SetTuneCAT(true); err != nil {
+			return err
+		}
+		fmt.Printf("TUNE ON — auto-unkeying after %s (never more than %s total)\n", hold, tuneMaxHoldCAT+tuneUnkeyConfirmBudgetCAT)
+		time.Sleep(hold)
+		if err := unkey(); err != nil {
+			return fmt.Errorf("TUNE ON succeeded but could not confirm unkey: %w", err)
+		}
+		fmt.Println("TUNE OFF (confirmed)")
+		return nil
+	default:
+		return fmt.Errorf("tune: unknown value %q (want on|off)", args[0])
+	}
+}
+
+// catZZ gives validated get/set/list access to every ZZxx extended CAT
+// command registered in internal/cat's zzFields table (~200 commands whose
+// wire shape was confirmed against their actual CATCommands.cs handler —
+// see PROTOCOLS.md for the ~100 left out and why). ZZTX/ZZTU are not in
+// that table by design (see zzfields.go) — attempting them here fails with
+// "not a registered ZZ field"; use 'ptt'/'tune' instead.
+func catZZ(c *cat.Client, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("zz: usage: zz list [prefix] | zz get <CODE> | zz set <CODE> <value>")
+	}
+	switch args[0] {
+	case "list":
+		prefix := ""
+		if len(args) == 2 {
+			prefix = strings.ToUpper(args[1])
+		}
+		return catZZList(prefix)
+	case "get":
+		if len(args) != 2 {
+			return fmt.Errorf("zz get: usage: zz get <CODE>")
+		}
+		f, ok := cat.LookupZZField(args[1])
+		if !ok {
+			return fmt.Errorf("zz get: %q is not a registered ZZ field — see 'zz list', or 'cat query %s' for raw access", args[1], strings.ToUpper(args[1]))
+		}
+		if f.Kind == cat.ZZAction {
+			return fmt.Errorf("zz get: %s is an action with no value — see 'cat query %s'", f.Code, f.Code)
+		}
+		v, err := c.GetZZ(args[1])
+		if err != nil {
+			return err
+		}
+		if f.Kind == cat.ZZBool {
+			fmt.Printf("%s (%s): %v\n", f.Code, f.Desc, v == 1)
+		} else {
+			fmt.Printf("%s (%s): %d\n", f.Code, f.Desc, v)
+		}
+		return nil
+	case "set":
+		if len(args) != 3 {
+			return fmt.Errorf("zz set: usage: zz set <CODE> <value>  (or 'zz set <CODE> on|off' for bool fields)")
+		}
+		f, ok := cat.LookupZZField(args[1])
+		if !ok {
+			return fmt.Errorf("zz set: %q is not a registered ZZ field — see 'zz list', or 'cat set %s <raw>' if you've confirmed the wire format yourself", args[1], strings.ToUpper(args[1]))
+		}
+		if f.Kind == cat.ZZAction {
+			if args[2] != "" {
+				return fmt.Errorf("zz set: %s is an action with no value — omit it or use 'cat set %s' directly", f.Code, f.Code)
+			}
+		}
+		valStr := args[2]
+		var v int
+		if f.Kind == cat.ZZBool {
+			switch valStr {
+			case "on", "1", "true":
+				v = 1
+			case "off", "0", "false":
+				v = 0
+			default:
+				return fmt.Errorf("zz set: %s is a bool field — want on|off (or 0|1), got %q", f.Code, valStr)
+			}
+		} else {
+			iv, err := strconv.Atoi(valStr)
+			if err != nil {
+				return fmt.Errorf("zz set: invalid value %q: %w", valStr, err)
+			}
+			v = iv
+		}
+		if err := c.SetZZ(args[1], v); err != nil {
+			return err
+		}
+		fmt.Printf("%s (%s) set to %s\n", f.Code, f.Desc, valStr)
+		return nil
+	default:
+		return fmt.Errorf("zz: unknown subcommand %q (want list|get|set)", args[0])
+	}
+}
+
+func catZZList(prefix string) error {
+	fields := cat.ListZZFields()
+	n := 0
+	for _, f := range fields {
+		if prefix != "" && !strings.HasPrefix(f.Code, prefix) {
+			continue
+		}
+		fmt.Printf("%-6s %-9s %s\n", f.Code, f.Kind, f.Desc)
+		n++
+	}
+	fmt.Printf("(%d fields", n)
+	if prefix != "" {
+		fmt.Printf(" matching %q", prefix)
+	}
+	fmt.Println(")")
+	return nil
 }
 
 func parseDuration(s string, def time.Duration) time.Duration {
