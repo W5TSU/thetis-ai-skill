@@ -25,99 +25,46 @@ safety protocol, see
 
 ## Install as an AI skill
 
-This repo doubles as a ready-to-use Claude Code skill
+This repo also ships a ready-to-use Claude Code skill
 (`.claude/skills/thetis-control/`) that lets an AI agent operate a Thetis
-radio through `thetisctl`, with the TX safety protocol built in. To install
-it:
-
-```bash
-# Project-local — drop it into a specific project:
-cp -r .claude/skills/thetis-control /path/to/your-project/.claude/skills/
-
-# Global — available in every project for this user:
-mkdir -p ~/.claude/skills
-cp -r .claude/skills/thetis-control ~/.claude/skills/
-```
-
-The skill assumes `thetisctl` is reachable on `PATH`, so build it first (see
-[Build](#build) below) and make sure the binary is installed before an agent
-tries to use the skill. Full skill behavior, deployment details, and the TX
-safety protocol live in
-[`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md)
-itself.
+radio through `thetisctl`, with the TX safety protocol built in. See
+[`SKILL.md`](.claude/skills/thetis-control/SKILL.md) to install and deploy
+it — it assumes `thetisctl` is already built and on `PATH` (below).
 
 ## Build
 
-Every push of a `v*` tag builds Linux, Windows, and macOS (amd64 + arm64)
-binaries via [GitHub Actions](.github/workflows/release.yml) and publishes
-them to [Releases](https://github.com/W5TSU/thetis-ai-skill/releases) —
-download one there, or build from source yourself.
+Prebuilt Linux/Windows/macOS (amd64+arm64) binaries publish to
+[Releases](https://github.com/W5TSU/thetis-ai-skill/releases/latest) on
+every `v*` tag, alongside a `SHA256SUMS` file — or build from source (Go
+1.22+, pure Go, no cgo, no dependencies):
 
-### Option A: download a prebuilt binary
+```bash
+go build -o thetisctl ./cmd/thetisctl
+```
 
-1. Grab the file for your platform from the
-   [latest release](https://github.com/W5TSU/thetis-ai-skill/releases/latest):
-   `thetisctl-linux-amd64`, `thetisctl-windows-amd64.exe`,
-   `thetisctl-darwin-amd64` (Intel Mac), or `thetisctl-darwin-arm64` (Apple
-   Silicon). A `SHA256SUMS` file is published alongside them if you want to
-   verify the download.
-2. **Linux/macOS** — make it executable and symlink it onto `PATH`:
-   ```bash
-   chmod +x thetisctl-linux-amd64     # or your platform's filename
-   sudo ln -sf "$(pwd)/thetisctl-linux-amd64" /usr/local/bin/thetisctl
-   ```
-3. **Windows (PowerShell)** — `%LOCALAPPDATA%\Microsoft\WindowsApps` is on
-   every user's `PATH` by default; creating a symlink there needs Developer
-   Mode on (Settings → Privacy & Security → For developers) or an elevated
-   prompt:
-   ```powershell
-   New-Item -ItemType SymbolicLink `
-     -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\thetisctl.exe" `
-     -Target "C:\path\to\thetisctl-windows-amd64.exe"
-   ```
-   Without Developer Mode, add the folder containing the `.exe` to your
-   `PATH` instead (System Properties → Environment Variables) rather than
-   symlinking.
-4. **Verify:**
-   ```bash
-   thetisctl help
-   ```
+Either way, put the binary on `PATH` and confirm it:
 
-### Option B: build from source
+```bash
+chmod +x thetisctl-linux-amd64     # skip if built from source
+sudo ln -sf "$(pwd)/thetisctl-linux-amd64" /usr/local/bin/thetisctl
+thetisctl help
+```
 
-1. **Prerequisite:** Go 1.22+ (pure Go, no cgo, no third-party dependencies
-   — builds anywhere Go runs).
-2. **Get the code:**
-   ```bash
-   git clone https://github.com/W5TSU/thetis-ai-skill.git
-   cd thetis-ai-skill
-   ```
-3. **Build:**
-   ```bash
-   go build -o thetisctl ./cmd/thetisctl
-   ```
-4. Put it on `PATH` the same way as Option A step 2/3, pointing at this
-   binary instead of a downloaded one.
-
-Either way there's no package manager and no runtime dependencies, and no
-Thetis-side install is needed (both servers already ship in Thetis; see
-below to turn them on). Optionally run `go vet ./...` and `go test ./...`
-after building from source if you want the code-quality/unit-test checks to
-pass before you rely on it.
+Windows steps (PowerShell symlink, or the Developer Mode caveat) are in
+[`SKILL.md`'s "Getting the CLI"](.claude/skills/thetis-control/SKILL.md#1-deploying-this-skill).
 
 ## Enabling the servers in Thetis
 
 Open **Setup** in the Thetis instance you want to control and turn on:
 
 - **TCP/IP CAT Server** — for Tier 1 commands (`thetisctl cat ...`). Default
-  bind `127.0.0.1:13013`. If `thetisctl` runs on a different machine, rebind
-  to the host's LAN IP (e.g. `192.168.1.50:13013`), not `127.0.0.1`.
+  bind `127.0.0.1:13013`.
 - **TCI Server** — for Tier 2 commands (`thetisctl tci ...`). Default bind
-  `127.0.0.1:50001`, same rebind note.
+  `127.0.0.1:50001`.
 
-Neither server has authentication — anyone who can reach the bound
-address/port can issue any command, including keying the transmitter. Only
-bind these on a trusted LAN; never expose them to the internet.
+If `thetisctl` runs on a different machine than Thetis, rebind both to the
+host's LAN IP (e.g. `192.168.1.50`) instead of `127.0.0.1` — see the
+no-authentication warning above.
 
 ## Global flags
 
