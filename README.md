@@ -116,8 +116,12 @@ reachable via `tci query` in the meantime — see
 | `tciserver on\|off` | Enable/disable the TCI server — works even when TCI itself is unreachable (CAT doesn't depend on it being up), so it can bootstrap TCI back on after a restart left the Setup checkbox unchecked |
 | `status` | Rig ID + frequency/mode/RIT/XIT/split/TX in one call |
 | `version` | Software version string, incl. the git short SHA the running build was made from (`ZZZV`) — verifies which commit a remote instance is actually running |
-| `query <CODE>` | Raw passthrough for any CAT command without a dedicated wrapper (e.g. `query ZZZV`) |
+| `query <CODE>` | Raw read passthrough for any CAT command without a dedicated wrapper (e.g. `query ZZZV`) |
+| `set <CODE> [params...]` | Raw write passthrough — refuses `TX`/`RX`/`ZZTX`/`ZZTU` (use `ptt`/`tune`, which apply the TX safety gate) |
+| `zz list [prefix]` | List every registered `ZZxx` extended CAT command (~200), each classified bool/unsigned/signed/action, with valid range where known |
+| `zz get <CODE>` / `zz set <CODE> <value>` | Validated get/set for any registered `ZZxx` command — the general-purpose way to reach the ~200 extended commands without a dedicated named wrapper; full list and methodology in [`PROTOCOLS.md`](PROTOCOLS.md) |
 | `ptt on\|off` | **TX-capable** — see [Transmitting](#transmitting-tx-capable-commands) |
+| `tune on\|off` | **TX-capable** — bare carrier via the Thetis-extended `ZZTU`; hard-capped at 5s total on-time, same as `tci tune` |
 
 ```bash
 ./thetisctl cat --host 192.168.1.50 freq set A 14074000
@@ -144,15 +148,44 @@ reachable via `tci query` in the meantime — see
 | `agc <rx> <mode>` | AGC mode: `off`/`fixed`, `long`, `slow`, `medium`/`normal`, `fast`, `custom` |
 | `agc-gain <rx> <-20..120>` | AGC gain/threshold |
 | `drive <rx> <0-100>` | TX drive power |
+| `tune-drive <rx> <0-100>` | TX drive power used while in TUNE mode |
 | `power on\|off` | Start/stop Thetis's radio engine, **not mains power**; waits for the server's confirmation broadcast |
+| `dds <rx> <hz>` | Retune the panorama/DDS center — moves the VFO along with it to preserve IF offset |
+| `if-offset <rx> <chan 0\|1> <offsetHz>` | Set a VFO's frequency as an offset from the DDS center (the spec-native alternative to `vfo`) |
+| `rx-enable <rx> on\|off` | Enable/disable RX2 as a software receiver (RX1 is always enabled) |
+| `rx-channel <rx> <chan 0\|1> on\|off` | Enable/disable an additional receive channel (sub-receiver) |
+| `nb\|bin\|nr\|anf\|apf\|nf <rx> on\|off` | DSP toggles: noise blanker, pseudo-stereo, noise reduction, auto-notch, CW audio-peak filter, tracking notch filter |
+| `sql <rx> on\|off` | Squelch enable |
+| `sql-level <rx> <-140..0 dB>` | Squelch threshold |
+| `volume <-60..0 dB>` | Main RX volume |
+| `mute on\|off` | Mute/unmute overall RX audio (both receivers) |
+| `rx-mute <rx> on\|off` | Mute/unmute a single receiver |
+| `rx-volume <rx> <chan 0\|1> <-60..0 dB>` | Per-channel RX audio gain |
+| `rx-balance <rx> <chan 0\|1> <-40..40>` | Per-channel stereo balance |
+| `rx-sensors on\|off [--interval <ms>]` | Enable/disable this connection receiving periodic S-meter broadcasts |
+| `tx-sensors on\|off [--interval <ms>]` | TX-side counterpart to `rx-sensors` |
+| `spot send <call> <mode> <hz> <argb> [text]` / `spot delete <call>` / `spot clear` | Push/remove/clear panadapter spots |
+| `focus` | Bring Thetis's main window to the foreground |
+| `iq-samplerate <hz>` | Negotiate IQ stream sample rate — cosmetic on current Thetis (echoed back, doesn't retune hardware) |
+| `audio-samplerate <hz>` | Set RX audio stream sample rate: `8000`\|`12000`\|`24000`\|`48000` |
 | `rx-audio capture <rx> --duration <d> --out <file.wav>` | Record RX audio to a WAV file |
 | `rx-audio stream <rx> --duration <d>` | Stream RX audio as raw float32 LE PCM to stdout |
+| `iq capture <rx> --duration <d> --out <file.wav>` | Record RX I/Q to a WAV file (always float32 — Thetis hard-codes IQ encoding) |
+| `iq stream <rx> --duration <d>` | Stream RX I/Q as raw float32 LE PCM to stdout |
 | `freedv-scan [--dwell 6s] [--out-dir <dir>]` | RX-only — tunes RX1 through the FreeDV calling frequencies, records a WAV per band, reports peak/RMS, restores original freq/mode when done |
 | `tune <rx> on\|off` | **TX-capable** — key TUNE (bare carrier); hard-capped at 5s total on-time |
 | `ptt <rx> on\|off [--audio]` | **TX-capable** — key PTT (`--audio` marks this connection as the TX audio source) |
 | `cw send <rx> "<text>" --speed <wpm> --mode <cw\|cwu\|cwl>` | **TX-capable** — key CW text via Thetis's own macro keyer |
+| `cw send-msg <rx> <prefix\|_> <call> <suffix> --speed <wpm> --mode <m>` | **TX-capable** — key CW with callsign-repeat/mid-transmission-edit support |
+| `cw edit-callsign <call>` | Edit the callsign of an in-progress `cw send-msg` transmission (not TX-capable on its own) |
+| `cw speed-up <wpm>` / `cw speed-down <wpm>` | Nudge the CW macro/message keyer speed |
+| `cw delay <ms>` | Delay between keying TX and the CW engine starting to send |
+| `cw terminal <rx> on\|off` | Toggle CW Terminal mode (stay keyed after a message finishes instead of auto-unkeying) |
 | `tx-audio send <rx> --file <wav>` | **TX-capable** — stream a WAV file as TX audio |
 | `query <cmd> [args...]` | Raw passthrough — send any TCI text command not listed above and print the reply |
+
+Full per-command detail (argument ranges, wire format, what's cosmetic vs.
+real on current Thetis) is in [`PROTOCOLS.md`](PROTOCOLS.md).
 
 ```bash
 ./thetisctl tci --host 192.168.1.50 vfo 0 0 14074000
@@ -172,10 +205,11 @@ FreeDV software, to confirm.
 
 ## Transmitting (TX-capable commands)
 
-`cat ptt`, `cat quickplay on`, `cat radae-sanity`, `tci tune`, `tci ptt`,
-`tci cw send`, and `tci tx-audio send` can key the transmitter. **Every one
-of them defaults to a dry run** — without `--confirm-tx`, they print exactly
-what they would send and do nothing TX-capable:
+`cat ptt`, `cat tune`, `cat quickplay on`, `cat radae-sanity`, `tci tune`,
+`tci ptt`, `tci cw send`, `tci cw send-msg`, and `tci tx-audio send` can key
+the transmitter. **Every one of them defaults to a dry run** — without
+`--confirm-tx`, they print exactly what they would send and do nothing
+TX-capable:
 
 ```
 $ ./thetisctl tci --host 192.168.1.50 cw send 0 "CQ CQ DE W5TSU" --speed 5 --mode cwu
