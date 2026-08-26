@@ -1,12 +1,6 @@
-# Local `go build ./cmd/thetisctl` output -- this module's binary shares its
-# name with the module (go.mod: `module thetisctl`), so `go build` with no
-# `-o` drops a `thetisctl` executable right here. Prebuilt binaries are
-# distributed via GitHub Releases (see .github/workflows/release.yml), not
-# committed to the tree.
-/thetisctl
-/thetisctl.exe
-/dist/
-
-# Other common local Go build/test artifacts, in case they ever show up here.
-*.test
-*.out
+__pycache__/
+*.pyc
+talk/.venv/
+talk/models/
+talk/logs/
+talk/config.toml

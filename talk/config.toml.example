@@ -1,0 +1,51 @@
+# talk station config — copy to config.toml (gitignored) and edit.
+# Every key shown; keys marked (required) have no default.
+
+[radio]
+host = "192.168.1.50"   # (required) Thetis PC address
+cat_port = 13013         # Thetis CAT-over-TCP port
+tci_port = 50001         # Thetis TCI websocket port
+rx = 0                   # receiver index (0 = RX1)
+sample_rate = 24000      # RX stream rate: 8000|12000|24000|48000
+
+[station]
+callsign = "W5TSU"       # (required) transmissions go out under this call
+# (required) your callsign in spoken phonetics — the fuzzy wake matcher
+# needs the words people will actually say:
+phonetic_words = ["whiskey", "five", "tango", "sierra", "uniform"]
+wake_names = ["thetis"]  # extra wake words that also address the station
+operator_name = "Mark"   # used by canned name/QTH replies
+qth = "Oklahoma City, Oklahoma"
+
+[scripts]
+# (required) station ID, appended per the hard-coded regulatory schedule:
+id_text = "This is W5TSU, automated voice assistant."
+# (required) sent when a QSO hits its time cap or the session expires:
+signoff = "Thanks for the contact. W5TSU clear."
+greeting = "Hello! You've reached the W5TSU automated station."
+fallback_reply = "Sorry, please say again."
+# Keep signal reports honest — there is no S-meter behind this reply:
+signal_report_template = "Good copy on your signal."
+
+[budgets]
+max_tx_seconds = 60           # hard cap per transmission (may not exceed 60)
+max_qso_seconds = 600         # QSO time cap, then signoff
+armed_session_seconds = 3600  # armed session auto-expiry
+qso_idle_close_seconds = 120  # close QSO context after this much silence
+
+[vad]
+threshold_ratio = 3.5    # speech threshold as a multiple of the noise floor
+onset_ms = 100           # this long above threshold = speech started
+hangover_ms = 800        # this long below threshold = utterance ended
+preroll_ms = 300         # audio kept from before onset
+min_utterance_ms = 400   # discard shorter blips (static crashes)
+max_utterance_seconds = 30  # force-cut longer utterances
+
+[claude]
+model = "claude-opus-5"  # reply-composition model (needs ANTHROPIC_API_KEY)
+max_context_turns = 12   # QSO turns remembered per contact
+timeout_seconds = 20     # API timeout before falling back to rules
+
+[logging]
+enabled = true           # per-session WAVs + JSONL transcript
+dir = "talk/logs"
