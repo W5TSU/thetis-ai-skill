@@ -69,18 +69,25 @@ class Brain:
         self._last_reply_text: str | None = None
 
     def compose(self, heard: str, qso: QsoContext) -> Decision:
+        decision = self._decide(heard, qso)
+        self._last_reply_text = decision.reply_text
+        # Every reply becomes part of the QSO's history, not just Claude's —
+        # a later Claude turn should see an earlier rule/fallback reply too,
+        # and it's this call's job to grow the context the caller passed in
+        # (nothing else populates it).
+        qso.add_turn(heard, decision.reply_text)
+        return decision
+
+    def _decide(self, heard: str, qso: QsoContext) -> Decision:
         rule_reply = self._rules.reply(heard, RuleContext(last_reply_text=self._last_reply_text))
         if rule_reply is not None:
-            self._last_reply_text = rule_reply.text
             return Decision(rule_reply.text, "rule", rule_reply.intent)
 
         if self._client is not None:
             text = self._ask_claude(heard, qso)
             if text is not None:
-                self._last_reply_text = text
                 return Decision(text, "claude")
 
-        self._last_reply_text = self._scripts.fallback_reply
         return Decision(self._scripts.fallback_reply, "fallback")
 
     def _ask_claude(self, heard: str, qso: QsoContext) -> str | None:

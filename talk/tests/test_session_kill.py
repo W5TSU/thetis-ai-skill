@@ -88,6 +88,34 @@ class NeverTriggeredKillSwitch:
         return False
 
 
+class StallWatchingStream(ScriptedStream):
+    """Records every set_stall_suspended call, standing in for RxStream's
+    real stall watchdog toggle (audio_rx.RxStream.set_stall_suspended)."""
+
+    def __init__(self, events):
+        super().__init__(events)
+        self.suspend_calls: list[bool] = []
+
+    def set_stall_suspended(self, suspended: bool) -> None:
+        self.suspend_calls.append(suspended)
+
+
+class ImmediateTransmitter:
+    """A transmitter that "completes" the instant it's checked."""
+
+    def __init__(self):
+        self.sent_async = False
+
+    def send_async(self, wav_path):
+        self.sent_async = True
+
+    def is_done(self):
+        return True
+
+    def result(self):
+        return TxResult(exit_code=0, saw_tx_off=True)
+
+
 class SlowTransmitter:
     """Never finishes on its own; only abort() ends it."""
 
@@ -145,6 +173,71 @@ class TestKillDuringTransmit(unittest.TestCase):
         self.assertTrue(transmitter.sent_async)
         self.assertTrue(transmitter.aborted)
         self.assertTrue(any(r["event"] == "kill-triggered" for r in records))
+
+
+class TestStallWatchdogSuspendedDuringTx(unittest.TestCase):
+    """RxStream keeps streaming (near-silent) audio while we transmit, so
+    without suspending its stall watchdog around a TX, a transmission
+    longer than the stall timeout would spuriously look like a dead radio
+    link. See audio_rx.RxStream's own docstring on this."""
+
+    def test_suspended_around_a_transmission_and_resumed_after(self):
+        events = [
+            RxEvent("audio", tone(1.0, 0.01)),
+            RxEvent("audio", tone(0.6, 0.2)),
+            RxEvent("audio", tone(1.0, 0.01)),
+            RxEvent("dead"),
+        ]
+        stream = StallWatchingStream(events)
+        with tempfile.TemporaryDirectory() as tmp:
+            log = SessionLog(tmp, enabled=True)
+            session = Session(
+                cfg(),
+                stream=stream,
+                vad=EnergyVAD(VADConfig(), RATE),
+                log=log,
+                sample_rate=RATE,
+                out=lambda *_: None,
+                transcriber=ScriptedTranscriber(["whiskey five tango sierra uniform hi"]),
+                station=STATION,
+                brain=FakeBrain(),
+                synthesizer=FakeSynthesizer(),
+                transmitter=ImmediateTransmitter(),
+                armed=True,
+                clocks=Clocks(cfg().budgets),
+            )
+            session.run()
+        self.assertEqual(stream.suspend_calls, [True, False])
+
+    def test_suspended_and_resumed_even_when_the_kill_switch_aborts_it(self):
+        events = [
+            RxEvent("audio", tone(1.0, 0.01)),
+            RxEvent("audio", tone(0.6, 0.2)),
+            RxEvent("audio", tone(1.0, 0.01)),
+            RxEvent("dead"),
+        ]
+        stream = StallWatchingStream(events)
+        transmitter = SlowTransmitter()
+        with tempfile.TemporaryDirectory() as tmp:
+            log = SessionLog(tmp, enabled=True)
+            session = Session(
+                cfg(),
+                stream=stream,
+                vad=EnergyVAD(VADConfig(), RATE),
+                log=log,
+                sample_rate=RATE,
+                out=lambda *_: None,
+                transcriber=ScriptedTranscriber(["whiskey five tango sierra uniform hi"]),
+                station=STATION,
+                brain=FakeBrain(),
+                synthesizer=FakeSynthesizer(),
+                transmitter=transmitter,
+                armed=True,
+                clocks=Clocks(cfg().budgets),
+                kill_switch=KillOnceTransmitStarts(transmitter),
+            )
+            session.run()
+        self.assertEqual(stream.suspend_calls, [True, False])
 
 
 class TestKillWhileListening(unittest.TestCase):

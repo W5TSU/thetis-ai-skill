@@ -237,18 +237,33 @@ class Session:
 
     def _transmit_with_kill_watch(self, out_path: Path):
         """Sends without blocking so a kill switch can abort mid-transmission
-        instead of only being checked once the child finishes on its own."""
-        self._transmitter.send_async(out_path)
-        while True:
-            if self._transmitter.is_done():
-                return self._transmitter.result()
-            if self._kill_switch is not None and self._kill_switch.triggered():
-                self._out("KILL: aborting in-flight transmission (keypress/interrupt)")
-                self._log.event("kill-triggered")
-                result = self._transmitter.abort(grace_seconds=10)
-                self._armed = False
-                return result
-            time.sleep(0.05)
+        instead of only being checked once the child finishes on its own.
+
+        Suspends the RX stream's stall watchdog for the duration: RX audio
+        keeps flowing (near-silent) while we transmit, so without this a
+        transmission longer than the stall timeout looks exactly like a
+        dead radio link (see audio_rx.RxStream). Streams that don't support
+        suspension (test doubles, the TALK_STREAM_CMD debug hook) are left
+        alone via duck typing.
+        """
+        set_suspended = getattr(self._stream, "set_stall_suspended", None)
+        if set_suspended is not None:
+            set_suspended(True)
+        try:
+            self._transmitter.send_async(out_path)
+            while True:
+                if self._transmitter.is_done():
+                    return self._transmitter.result()
+                if self._kill_switch is not None and self._kill_switch.triggered():
+                    self._out("KILL: aborting in-flight transmission (keypress/interrupt)")
+                    self._log.event("kill-triggered")
+                    result = self._transmitter.abort(grace_seconds=10)
+                    self._armed = False
+                    return result
+                time.sleep(0.05)
+        finally:
+            if set_suspended is not None:
+                set_suspended(False)
 
     def _close_qso(self) -> None:
         self._clocks.close_qso()

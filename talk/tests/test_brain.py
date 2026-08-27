@@ -82,6 +82,32 @@ class TestRulesFirst(unittest.TestCase):
         self.assertEqual(decision.reply_text, "Good copy on your signal.")
         self.assertEqual(api.calls, [])
 
+    def test_rule_reply_is_recorded_into_qso_context(self):
+        brain = make_brain(client=None)
+        qso = QsoContext()
+        brain.compose("how do you copy", qso)
+        self.assertEqual(qso.turns, [("how do you copy", "Good copy on your signal.")])
+
+
+class TestQsoContextRecording(unittest.TestCase):
+    """Every compose() call must record its own turn — this is what gives
+    the *next* call its conversation history. Without it, QsoContext.turns
+    never grows and Claude never sees prior turns in a QSO."""
+
+    def test_fallback_reply_is_recorded(self):
+        brain = make_brain(client=None)
+        qso = QsoContext()
+        brain.compose("what's the weather like", qso)
+        self.assertEqual(qso.turns, [("what's the weather like", SCRIPTS.fallback_reply)])
+
+    def test_second_call_sees_first_calls_turn_without_manual_wiring(self):
+        # No test-side qso.add_turn() call here — compose() itself must wire it.
+        brain = make_brain(client=None)
+        qso = QsoContext()
+        brain.compose("first thing heard", qso)
+        brain.compose("say again please", qso)  # the "repeat" rule needs history
+        self.assertEqual(qso.turns[0], ("first thing heard", SCRIPTS.fallback_reply))
+
 
 @unittest.skipUnless(HAS_ANTHROPIC, "needs the anthropic package installed")
 class TestClaudeFallthrough(unittest.TestCase):
@@ -94,6 +120,15 @@ class TestClaudeFallthrough(unittest.TestCase):
         self.assertEqual(len(api.calls), 1)
         self.assertIn("system", api.calls[0])
         self.assertIn("automated", api.calls[0]["system"].lower())
+
+    def test_claude_reply_is_recorded_into_qso_context(self):
+        api = FakeMessagesAPI(responses=["Sure, the weather here is clear."])
+        brain = make_brain(FakeClient(messages_api=api))
+        qso = QsoContext()
+        brain.compose("what's the weather like", qso)
+        self.assertEqual(
+            qso.turns, [("what's the weather like", "Sure, the weather here is clear.")]
+        )
 
     def test_qso_context_sent_as_message_history(self):
         api = FakeMessagesAPI(responses=["reply two"])
