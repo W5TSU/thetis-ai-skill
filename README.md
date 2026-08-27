@@ -2,12 +2,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Go CLI for remotely controlling a running Thetis SDR instance over its
-existing network protocols: CAT-over-TCP (frequency, mode, filters, VFO,
+**thetisctl** igives remote control of a running Thetis SDR instance over its
+existing network using CAT-over-TCP (frequency, mode, filters, VFO,
 RIT/XIT, split, AGC, attenuator/preamp, band) and TCI-over-WebSocket (the
-same controls plus RX/TX audio streaming, CW keying, and transmit). No
-Thetis-side code changes are required — both servers already exist in
-Thetis, they're just usually off by default.
+same controls plus RX/TX audio streaming, CW keying, and transmit). 
+
+No Thetis-side code changes are required — both servers already exist in
+Thetis, they're just usually off by default. ( > Version 1.3.17 )
 
 > **⚠️ Only point this at a radio you directly control.** `thetisctl` can key
 > a real transmitter into a real antenna — its TX-capable commands cause
@@ -18,10 +19,8 @@ Thetis, they're just usually off by default.
 > is controllable — never run this against someone else's station, or point
 > it at an address you don't already trust, without their explicit consent.
 
-This file is a plain command reference for a human running `thetisctl`
-directly. For the AI-agent workflow, deployment steps, and the full TX
-safety protocol, see
-[`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md).
+It can be used by humans. For the AI-agent  workflow, deployment steps, and the full TX
+safety protocol, see [`.claude/skills/thetis-control/SKILL.md`](.claude/skills/thetis-control/SKILL.md).
 
 ## Install as an AI skill
 
@@ -34,8 +33,7 @@ it — it assumes `thetisctl` is already built and on `PATH` (below).
 ## Build
 
 Prebuilt Linux/Windows/macOS (amd64+arm64) binaries publish to
-[Releases](https://github.com/W5TSU/thetis-ai-skill/releases/latest) on
-every `v*` tag, alongside a `SHA256SUMS` file — or build from source (Go
+[Releases](https://github.com/W5TSU/thetis-ai-skill/releases/latest) on every `v*` tag, alongside a `SHA256SUMS` file — or build from source (Go
 1.22+, pure Go, no cgo, no dependencies):
 
 ```bash
@@ -85,16 +83,11 @@ meantime — see [`PROTOCOLS.md`](PROTOCOLS.md).
 
 ## Transmitting (TX-capable commands)
 
-`cat ptt`, `cat tune`, `cat quickplay on`, `cat radae-sanity`, `tci tune`,
-`tci ptt`, `tci cw send`, `tci cw send-msg`, and `tci tx-audio send` can key
-the transmitter. There is also `talk` (`talk/`, this repo's Python AI voice
-operator) — it runs in rehearsal mode by default (no TX), and transmits only
-when armed with `--armed --confirm-tx`; that flow is a bounded exception to
-the single-transmission model below, documented in
-[`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) and
-`talk/README.md`. **Every one of the CLI commands above defaults to a dry
-run** — without
-`--confirm-tx`, they print exactly what they would send and do nothing
+These commands ()`cat ptt`, `cat tune`, `cat quickplay on`, `cat radae-sanity`, `tci tune`,
+`tci ptt`, `tci cw send`, `tci cw send-msg`, and `tci tx-audio send`) can  ⚠️  key
+your  transmitter. 
+
+There is also `talk` (`talk/`, this repo's Python AI voice operator) — it runs in rehearsal mode by default (no TX), and transmits only when armed with `--armed --confirm-tx`; that flow is a bounded exception to the single-transmission model below, documented in  [`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) and `talk/README.md`. **Every one of the CLI commands above defaults to a dry  run** — without `--confirm-tx`, they print exactly what they would send and do nothing
 TX-capable:
 
 ```
@@ -103,8 +96,7 @@ $ ./thetisctl tci --host 192.168.1.50 cw send 0 "CQ CQ DE W5TSU" --speed 5 --mod
 Pass --confirm-tx=I-UNDERSTAND-THIS-KEYS-THE-RADIO to actually transmit this message.
 ```
 
-To actually transmit, add the exact phrase (not a bare flag — this is
-deliberate, so nothing else can accidentally trigger it):
+To actually transmit, add the exact phrase (not a bare flag — this is deliberate, so nothing else can accidentally trigger it):
 
 ```bash
 ./thetisctl tci --host 192.168.1.50 cw send 0 "CQ CQ DE W5TSU" --speed 5 --mode cwu \
@@ -129,12 +121,8 @@ requests.
 
 ## Live tests
 
-`go test ./...` only runs unit tests. Round-tripping every command against a
-real Thetis instance needs the `live` build tag and a few env vars — see
-[`AGENTS.md`'s Verification section](AGENTS.md#verification) for the exact
-commands, which files they cover, and the separate opt-in required to
-actually key the transmitter (`txlive_test.go`) — not something an AI agent
-should ever run unprompted; see `SKILL.md`'s safety protocol.
+`go test ./...` only runs unit tests. Round-tripping every command against a real Thetis instance needs the `live` build tag and a few env vars — see
+[`AGENTS.md`'s Verification section](AGENTS.md#verification) for the exact commands, which files they cover, and the separate opt-in required to actually key the transmitter (`txlive_test.go`) — not something an AI agent should ever run unprompted; see `SKILL.md`'s safety protocol.
 
 ## Known gotchas
 
@@ -153,31 +141,13 @@ A few headliners — the full incident history and root-cause writeups are in
 
 ## Extending thetisctl
 
-Wire formats were confirmed by reading Thetis's own source, not just
-protocol docs — see
-[`SKILL.md`'s "Extending the command set"](.claude/skills/thetis-control/SKILL.md#extending-the-command-set)
-for the exact files and gotchas to check before adding new commands.
+Wire formats were confirmed by reading Thetis's own source, not just protocol docs — see [`SKILL.md`'s "Extending the command set"](.claude/skills/thetis-control/SKILL.md#extending-the-command-set) for the exact files and gotchas to check before adding new commands.
 
 ## talk — AI voice operator
 
-`talk/` is a separate Python subsystem, not part of `thetisctl` itself: an
-AI that hears voice over the radio and answers back over the radio, on
-analog SSB/FM, while a human operator supervises. It drives `thetisctl` as
-a child process for every radio interaction — the Go tool above needs no
-changes to support it. Full design, glossary, and status live in
-[`talk/README.md`](talk/README.md); this section is the quick-start.
+`talk/` is a separate Python subsystem, not part of `thetisctl` itself: an AI that hears voice over the radio and answers back over the radio, on analog SSB/FM, while a human operator supervises. It drives `thetisctl` as a child process for every radio interaction — the Go tool above needs no changes to  upport it. Full design, glossary, and status live in [`talk/README.md`](talk/README.md); this section is the quick-start.
 
-**Two modes, one flag.** Plain `python -m talk --config talk/config.toml`
-runs **rehearsal mode**: it listens continuously, transcribes locally
-(faster-whisper), recognizes when it's been addressed (a fuzzy match on
-your phonetic callsign or a configured wake word), composes a reply
-(canned rules first, Claude for anything else), synthesizes it (Piper),
-and plays it on your local speakers. The radio is never keyed. Adding
-`--armed --confirm-tx I-UNDERSTAND-THIS-KEYS-THE-RADIO` transmits for
-real instead — see
-[`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) for the safety
-model this depends on before ever using it. **Only a human operator, at
-their own terminal, should ever run the armed form** — never an agent.
+**Two modes, one flag.** Plain `python -m talk --config talk/config.toml` runs **rehearsal mode**: it listens continuously, transcribes locally (faster- hisper), recognizes when it's been addressed (a fuzzy match on your phonetic callsign or a configured wake word), composes a reply (canned rules first,  laude for anything else), synthesizes it (Piper),  and plays it on your local speakers. The radio is never keyed. Adding `--armed --confirm-tx I- NDERSTAND-THIS-KEYS-THE-RADIO` transmits for real instead — see [`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) for the safety model this depends on before ever using it. **Only a  uman operator, at their own terminal, should ever run the armed form** — never an agent. 
 
 **Setup:**
 
@@ -189,20 +159,6 @@ $EDITOR config.toml                     # radio host, your callsign/phonetics, s
 .venv/bin/python -m talk --config config.toml --check   # validate config, print the station banner
 ```
 
-Prerequisites: both Thetis servers enabled and reachable — CAT (`13013`)
-for radio-state polling, TCI (`50001`) for audio and (when armed)
-transmit — same as the rest of this README's
-["Enabling the servers in Thetis"](#enabling-the-servers-in-thetis). An
-`ANTHROPIC_API_KEY` in the environment enables the Claude half of the
-brain; without it, `talk` runs rules-only and says so at startup.
+Prerequisites: both Thetis servers enabled and reachable — CAT (`13013`) for radio-state polling, TCI (`50001`) for audio and (when armed) transmit —  ame as the rest of this README's ["Enabling the servers in Thetis"](#enabling-the-servers-in-thetis). An `ANTHROPIC_API_KEY` in the environment enables the Claude half of the brain;  without it, `talk` runs rules-only and says so at startup.
 
-**Tuning before ever arming:** run rehearsal mode against the real radio
-(RX-only, always safe) and watch how reliably it endpoints utterances and
-recognizes your callsign against real band noise before considering an
-armed session. `[vad]` in `config.toml` — `threshold_ratio`, `hangover_ms`,
-`min_utterance_ms` — is what to adjust: a `threshold_ratio` that's too low
-makes band noise trigger false utterances; too high and the leading
-syllable of real speech gets clipped before onset confirms. The session log's JSONL records every utterance's duration, transcript, and
-trigger score — use that to see what's actually being detected before
-adjusting thresholds blind. `talk/tests/live_armed.md` is the human-only
-procedure for the first armed session, once rehearsal behaves well.
+**Tuning before ever arming:** run rehearsal mode against the real radio (RX-only, always safe) and watch how reliably it endpoints utterances and recognizes your callsign against real band noise before considering an armed session. `[vad]` in `config.toml` — `threshold_ratio`, `hangover_ms`, `min_utterance_ms` — is what to adjust: a `threshold_ratio` that's too low makes band noise trigger false utterances; too high and the leading syllable of  real speech gets clipped before onset confirms. The session log's JSONL records every utterance's duration, transcript, and trigger score — use that to see what's actually being detected before adjusting thresholds blind. `talk/tests/live_armed.md` is the human-only procedure for the first armed session, once rehearsal behaves well.
