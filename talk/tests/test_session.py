@@ -101,6 +101,42 @@ class TestSessionRecognize(unittest.TestCase):
         self.assertFalse(u["triggered"])
         self.assertTrue(any("silent" in line for line in out))
 
+    def test_utterance_still_in_progress_at_stream_death_is_flushed(self):
+        # No trailing silence before "dead": real audio doesn't reliably
+        # trail into hangover-length silence, so a flush on stream end must
+        # recover it rather than losing what was heard.
+        class AbruptEndStream:
+            def events(self):
+                return iter([
+                    RxEvent("audio", tone(1.0, 0.01)),
+                    RxEvent("audio", tone(0.6, 0.2)),
+                    RxEvent("dead"),
+                ])
+
+            def stop(self):
+                pass
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log = SessionLog(tmp, enabled=True)
+            out = []
+            session = Session(
+                make_cfg(),
+                stream=AbruptEndStream(),
+                vad=EnergyVAD(VADConfig(), RATE),
+                log=log,
+                sample_rate=RATE,
+                out=out.append,
+                transcriber=FakeTranscriber("thetis are you there"),
+                station=STATION,
+            )
+            session.run()
+            records = []
+            for p in pathlib.Path(tmp).iterdir():
+                records += [json.loads(l) for l in (p / "session.jsonl").read_text().splitlines()]
+            utterances = [r for r in records if r["event"] == "utterance"]
+            self.assertEqual(len(utterances), 1)
+            self.assertTrue(utterances[0]["forced_cut"])
+
     def test_no_transcriber_degrades_gracefully(self):
         records, out = self._run(transcriber=None)
         u = next(r for r in records if r["event"] == "utterance")

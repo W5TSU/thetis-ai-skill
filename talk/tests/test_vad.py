@@ -73,6 +73,35 @@ class TestEnergyVAD(unittest.TestCase):
         utts = feed_all(vad, pcm)
         self.assertEqual(len(utts), 1)
 
+    def test_onset_survives_a_rising_speech_envelope(self):
+        # Regression: real speech ramps up over several blocks rather than
+        # snapping instantly to full amplitude. A floor that adapts on the
+        # ramp-up blocks themselves (not just true silence) can chase the
+        # rising level and never accumulate 5 consecutive loud blocks.
+        # Amplitudes approximate a real captured caller utterance's onset.
+        vad = make_vad()
+        ramp = [0.0009, 0.0726, 0.1835, 0.2749, 0.1104, 0.0348, 0.0235]
+        pcm = tone(1.0, 0.001)  # quiet band noise to seed the floor
+        for amp in ramp:
+            pcm += tone(0.02, amp)
+        pcm += tone(0.5, 0.2)  # sustained speech following the ramped onset
+        pcm += tone(1.0, 0.001)
+        self.assertEqual(len(feed_all(vad, pcm)), 1)
+
+    def test_flush_returns_in_progress_speech_at_stream_end(self):
+        vad = make_vad()
+        pcm = tone(1.0, 0.01) + tone(0.5, 0.2)  # ends abruptly mid-speech, no trailing silence
+        self.assertEqual(feed_all(vad, pcm), [])  # nothing yet: hangover never completed
+        u = vad.flush()
+        self.assertIsNotNone(u)
+        self.assertTrue(u.forced_cut)
+        self.assertGreater(len(u.samples) / RATE, 0.4)
+
+    def test_flush_when_not_in_speech_returns_none(self):
+        vad = make_vad()
+        feed_all(vad, tone(1.0, 0.01))
+        self.assertIsNone(vad.flush())
+
     def test_two_utterances_split_by_long_silence(self):
         vad = make_vad()
         pcm = (

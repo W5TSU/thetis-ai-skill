@@ -69,7 +69,11 @@ class EnergyVAD:
         loud = rms > threshold
 
         if not self._in_speech:
-            self._floor = (1 - FLOOR_ALPHA) * self._floor + FLOOR_ALPHA * rms
+            if not loud:
+                # Only quiet blocks move the floor. Adapting on loud blocks
+                # too would let a rising threshold chase a rising speech
+                # envelope and starve onset of its 5 consecutive hits.
+                self._floor = (1 - FLOOR_ALPHA) * self._floor + FLOOR_ALPHA * rms
             self._preroll.append(block)
             if len(self._preroll) > self._preroll_blocks + self._onset_blocks:
                 self._preroll.pop(0)
@@ -105,6 +109,18 @@ class EnergyVAD:
         self._speech_start_block = self._blocks_seen - len(self._preroll)
         self._loud_blocks = self._onset_blocks
         self._preroll = []
+
+    def flush(self) -> Utterance | None:
+        """Return any in-progress speech as a force-cut Utterance.
+
+        Call this when the stream ends or restarts: real audio, unlike the
+        synthetic fixtures above, doesn't reliably trail off into hangover-
+        length silence, so without a flush a stream cut mid-utterance would
+        silently lose whatever was said.
+        """
+        if not self._in_speech:
+            return None
+        return self._end_speech(forced=True)
 
     def _end_speech(self, forced: bool) -> Utterance | None:
         samples = self._speech

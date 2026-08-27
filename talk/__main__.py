@@ -24,7 +24,9 @@ from talk import config as config_mod
 from talk.audio_rx import RxStream
 from talk.constants import ID_INTERVAL_SECONDS
 from talk.qsolog import SessionLog
+from talk.rules import RuleEngine
 from talk.session import Session
+from talk.transmit import Player
 from talk.vad import EnergyVAD
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -141,6 +143,19 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool) -> int:
             file=sys.stderr,
         )
 
+    synthesizer = None
+    try:
+        from talk.tts import Synthesizer
+
+        voice = REPO_ROOT / "talk" / "models" / "piper" / "en_US-lessac-medium.onnx"
+        synthesizer = Synthesizer(model_path=str(voice))
+    except ImportError:
+        print(
+            "talk: WARNING text-to-speech unavailable (piper-tts not installed); "
+            "will not synthesize replies — run talk/setup.sh",
+            file=sys.stderr,
+        )
+
     session = Session(
         cfg,
         stream=RxStream(stream_cmd),
@@ -148,6 +163,10 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool) -> int:
         log=log,
         sample_rate=rate,
         transcriber=transcriber,
+        rule_engine=RuleEngine(cfg.scripts, cfg.station.operator_name, cfg.station.qth),
+        synthesizer=synthesizer,
+        player=Player(),
+        armed=False,  # arming ritual arrives in a later slice
     )
     return session.run()
 

@@ -7,9 +7,13 @@ transmit) with the QSO/ID/session clocks.
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 from talk.config import StationConfig, TalkConfig
 from talk.matcher import match as default_match
 from talk.qsolog import SessionLog
+from talk.rules import RuleContext
 
 
 class Session:
@@ -24,6 +28,11 @@ class Session:
         transcriber=None,
         station: StationConfig | None = None,
         matcher=default_match,
+        rule_engine=None,
+        synthesizer=None,
+        player=None,
+        transmitter=None,
+        armed: bool = False,
     ):
         self._cfg = cfg
         self._stream = stream
@@ -34,6 +43,13 @@ class Session:
         self._transcriber = transcriber
         self._station = station or cfg.station
         self._matcher = matcher
+        self._rule_engine = rule_engine
+        self._synthesizer = synthesizer
+        self._player = player
+        self._transmitter = transmitter
+        self._armed = armed
+        self._last_reply_text: str | None = None
+        self._reply_seq = 0
 
     def run(self) -> int:
         """Consume the RX stream until it dies or the operator interrupts."""
@@ -44,12 +60,15 @@ class Session:
                     if utterance is not None:
                         self._on_utterance(utterance)
                 elif ev.kind == "restart":
+                    self._flush_pending_speech()
                     self._log.event("stream-gap")
                     self._out("rx stream hit planned expiry; restarted (gap logged)")
                 elif ev.kind == "stalled":
+                    self._flush_pending_speech()
                     self._log.event("rx-stalled")
                     self._out("WARNING: rx stream stalled (no data from radio); restarting")
                 elif ev.kind == "dead":
+                    self._flush_pending_speech()
                     self._log.event("rx-dead")
                     self._out("ERROR: rx stream died; radio unreachable")
                     return 1
@@ -60,6 +79,11 @@ class Session:
             return 130
         finally:
             self._log.close()
+
+    def _flush_pending_speech(self) -> None:
+        u = self._vad.flush()
+        if u is not None:
+            self._on_utterance(u)
 
     def _on_utterance(self, u) -> None:
         duration = len(u.samples) / self._rate
@@ -87,3 +111,43 @@ class Session:
 
         self._log.event("utterance", **fields)
         self._out(line)
+
+        if self._transcriber is not None and decision.triggered:
+            self._reply(transcript.text)
+
+    def _reply(self, heard_text: str) -> None:
+        intent = "fallback"
+        reply_text = self._cfg.scripts.fallback_reply
+        if self._rule_engine is not None:
+            rule_reply = self._rule_engine.reply(
+                heard_text, RuleContext(last_reply_text=self._last_reply_text)
+            )
+            if rule_reply is not None:
+                intent, reply_text = rule_reply.intent, rule_reply.text
+
+        self._last_reply_text = reply_text
+        if self._synthesizer is None:
+            self._log.event("reply", intent=intent, text=reply_text, armed=self._armed, synthesized=False)
+            self._out(f'  -> reply ({intent}): "{reply_text}" [not synthesized]')
+            return
+
+        self._reply_seq += 1
+        wav_dir = self._log.dir if self._log.enabled else Path(tempfile.gettempdir())
+        out_path = wav_dir / f"{self._reply_seq:04d}-reply.wav"
+        duration = self._synthesizer.synthesize(reply_text, out_path)
+        self._log.event(
+            "reply",
+            intent=intent,
+            text=reply_text,
+            duration=round(duration, 3),
+            wav=str(out_path),
+            armed=self._armed,
+        )
+
+        if self._armed:
+            assert self._transmitter is not None, "armed session requires a transmitter"
+            self._transmitter.send(out_path)
+            self._out(f'  -> TX ({intent}, {duration:.1f}s): "{reply_text}"')
+        elif self._player is not None:
+            self._player.play(out_path)
+            self._out(f'  -> reply ({intent}, {duration:.1f}s, rehearsal): "{reply_text}"')
