@@ -4,3 +4,6 @@ talk/.venv/
 talk/models/
 talk/logs/
 talk/config.toml
+
+# built binary (README/AGENTS.md both document `go build -o thetisctl ...`)
+/thetisctl

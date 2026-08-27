@@ -1,19 +1,24 @@
 # Talk — an AI voice operator for the station
 
-**Status: design phase.** This branch (`talk`) is where thetisctl grows an AI
-that can *hear voice over the radio and respond by voice over the radio* — an
-AI radio operator, supervised by a human control operator. Nothing here is
-functional yet; this README records what we're building and the decisions
-already made, so the work can proceed in reviewable slices.
+An AI that can *hear voice over the radio and respond by voice over the
+radio* — an AI radio operator, supervised by a human control operator. All
+eight implementation slices below have landed and are covered by the
+offline test suite; **the one thing that has never happened is a real armed
+transmission** — no radio was reachable during development, and arming is,
+by design, a human-only act. See
+[`tests/live_armed.md`](tests/live_armed.md) before ever running this
+armed for the first time. Quick-start setup/config lives in the "talk —
+AI voice operator" section of [the root README](../README.md); this file
+is the design record and the fuller rationale behind it.
 
 > **⚠️ Everything in the root README's transmit warning applies double here.**
-> This feature will key a real transmitter repeatedly under a single human
+> This feature keys a real transmitter repeatedly under a single human
 > authorization. It is designed around a human control operator being
 > physically present, with rehearsal (no-TX) mode as the default and hard
-> airtime budgets — but until the safety slices land and are reviewed, do not
-> point any of this at a radio.
+> airtime budgets — but it has not yet been proven against a real radio.
+> Read `tests/live_armed.md` in full before ever passing `--armed`.
 
-## What it does (when finished)
+## What it does
 
 While the operator sits at the control point, they tune the radio, then arm
 the loop. It listens continuously to RX audio, detects utterances, and
@@ -66,33 +71,28 @@ instantly unkeys and disarms**.
   engines. Live armed testing follows the repo's existing environment-gated,
   human-only procedure.
 
-## The plan
+## Implementation, as landed
 
-Work lands as tracer-bullet slices, each demoable on its own, in order:
+Built as tracer-bullet slices, each demoable on its own — all eight are
+complete:
 
-1. **Bootstrap & config** — venv/model setup, TOML config, station banner.
-2. **Hear the band** — continuous RX streaming + voice-activity detection;
+1. ✅ **Bootstrap & config** — venv/model setup, TOML config, station banner.
+2. ✅ **Hear the band** — continuous RX streaming + voice-activity detection;
    utterance WAVs and turn records appear in the session log.
-3. **Recognize being called** — local transcription + fuzzy wake matching.
-4. **Reply in rehearsal** — rule engine + TTS; replies audible on local
+3. ✅ **Recognize being called** — local transcription + fuzzy wake matching.
+4. ✅ **Reply in rehearsal** — rule engine + TTS; replies audible on local
    speakers, radio never keyed.
-5. **Claude brain** — conversational replies with per-QSO context and live
+5. ✅ **Claude brain** — conversational replies with per-QSO context and live
    degradation to rules.
-6. **Safety core** — the clocks, budgets, and disarm conditions, under a
-   fake-clock test suite. The safety-review centerpiece.
-7. **Armed transmit** — the arming ritual, the keypress kill switch with
+6. ✅ **Safety core** — the clocks, budgets, and disarm conditions, under a
+   fake-clock test suite.
+7. ✅ **Armed transmit** — the arming ritual, the keypress kill switch with
    confirmed unkey, real transmission, and the control skill's explicit
-   session-armed carve-out (this will be the first feature in this repo
-   that keys repeatedly on one human authorization — the skill's
-   per-transmission consent rule gets a single sanctioned, documented
-   exception, and only a human may ever run the arming command).
-8. **Docs & glossary** — operator docs, agent contract updates, and the
-   repo glossary (utterance, turn, armed session, rehearsal mode, wake).
+   session-armed carve-out (`SKILL.md` §6) — the first feature in this repo
+   that keys repeatedly on one human authorization.
+8. ✅ **Docs & glossary** — this file, the root README section, `AGENTS.md`'s
+   Python-subtree contract, and the repo glossary.
 
-## Vocabulary
-
-- **Utterance** — one continuous stretch of received speech, ended by silence.
-- **Turn** — utterance → transcribe → decide → (maybe) reply transmission.
-- **Armed session** — the window between the operator arming TX and disarm.
-- **Rehearsal mode** — the full pipeline with local playback; radio never keyed.
-- **Wake** — a trigger that addresses the station: phonetic callsign or wake name.
+Vocabulary (Utterance, Turn, Wake, QSO, Rehearsal mode, Armed session,
+Disarm, ...) is defined once, canonically, in the
+[repo's `CONTEXT.md`](../CONTEXT.md) — not duplicated here.
