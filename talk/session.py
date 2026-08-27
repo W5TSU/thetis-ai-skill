@@ -10,10 +10,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+from talk.brain import QsoContext
 from talk.config import StationConfig, TalkConfig
 from talk.matcher import match as default_match
 from talk.qsolog import SessionLog
-from talk.rules import RuleContext
 
 
 class Session:
@@ -28,7 +28,7 @@ class Session:
         transcriber=None,
         station: StationConfig | None = None,
         matcher=default_match,
-        rule_engine=None,
+        brain=None,
         synthesizer=None,
         player=None,
         transmitter=None,
@@ -43,12 +43,12 @@ class Session:
         self._transcriber = transcriber
         self._station = station or cfg.station
         self._matcher = matcher
-        self._rule_engine = rule_engine
+        self._brain = brain
         self._synthesizer = synthesizer
         self._player = player
         self._transmitter = transmitter
         self._armed = armed
-        self._last_reply_text: str | None = None
+        self._qso = QsoContext()
         self._reply_seq = 0
 
     def run(self) -> int:
@@ -116,19 +116,17 @@ class Session:
             self._reply(transcript.text)
 
     def _reply(self, heard_text: str) -> None:
-        intent = "fallback"
-        reply_text = self._cfg.scripts.fallback_reply
-        if self._rule_engine is not None:
-            rule_reply = self._rule_engine.reply(
-                heard_text, RuleContext(last_reply_text=self._last_reply_text)
-            )
-            if rule_reply is not None:
-                intent, reply_text = rule_reply.intent, rule_reply.text
+        if self._brain is None:
+            return
+        decision = self._brain.compose(heard_text, self._qso)
+        intent, source, reply_text = decision.intent, decision.source, decision.reply_text
 
-        self._last_reply_text = reply_text
         if self._synthesizer is None:
-            self._log.event("reply", intent=intent, text=reply_text, armed=self._armed, synthesized=False)
-            self._out(f'  -> reply ({intent}): "{reply_text}" [not synthesized]')
+            self._log.event(
+                "reply", intent=intent, intent_source=source, text=reply_text,
+                armed=self._armed, synthesized=False,
+            )
+            self._out(f'  -> reply ({source}): "{reply_text}" [not synthesized]')
             return
 
         self._reply_seq += 1
@@ -138,6 +136,7 @@ class Session:
         self._log.event(
             "reply",
             intent=intent,
+            intent_source=source,
             text=reply_text,
             duration=round(duration, 3),
             wav=str(out_path),
@@ -147,7 +146,7 @@ class Session:
         if self._armed:
             assert self._transmitter is not None, "armed session requires a transmitter"
             self._transmitter.send(out_path)
-            self._out(f'  -> TX ({intent}, {duration:.1f}s): "{reply_text}"')
+            self._out(f'  -> TX ({source}, {duration:.1f}s): "{reply_text}"')
         elif self._player is not None:
             self._player.play(out_path)
-            self._out(f'  -> reply ({intent}, {duration:.1f}s, rehearsal): "{reply_text}"')
+            self._out(f'  -> reply ({source}, {duration:.1f}s, rehearsal): "{reply_text}"')

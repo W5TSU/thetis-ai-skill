@@ -23,6 +23,7 @@ from pathlib import Path
 from talk import config as config_mod
 from talk.audio_rx import RxStream
 from talk.constants import ID_INTERVAL_SECONDS
+from talk.brain import Brain
 from talk.qsolog import SessionLog
 from talk.rules import RuleEngine
 from talk.session import Session
@@ -156,6 +157,28 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool) -> int:
             file=sys.stderr,
         )
 
+    claude_client = None
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("talk: no ANTHROPIC_API_KEY set; running rules-only", file=sys.stderr)
+    else:
+        try:
+            import anthropic
+
+            claude_client = anthropic.Anthropic()
+        except ImportError:
+            print(
+                "talk: WARNING anthropic not installed; running rules-only — run talk/setup.sh",
+                file=sys.stderr,
+            )
+
+    brain = Brain(
+        rule_engine=RuleEngine(cfg.scripts, cfg.station.operator_name, cfg.station.qth),
+        scripts=cfg.scripts,
+        station=cfg.station,
+        claude_config=cfg.claude,
+        claude_client=claude_client,
+    )
+
     session = Session(
         cfg,
         stream=RxStream(stream_cmd),
@@ -163,7 +186,7 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool) -> int:
         log=log,
         sample_rate=rate,
         transcriber=transcriber,
-        rule_engine=RuleEngine(cfg.scripts, cfg.station.operator_name, cfg.station.qth),
+        brain=brain,
         synthesizer=synthesizer,
         player=Player(),
         armed=False,  # arming ritual arrives in a later slice

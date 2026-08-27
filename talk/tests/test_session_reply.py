@@ -9,7 +9,8 @@ import unittest
 from array import array
 
 from talk.audio_rx import RxEvent
-from talk.config import RadioConfig, ScriptsConfig, StationConfig, TalkConfig, VADConfig
+from talk.brain import Brain
+from talk.config import ClaudeConfig, RadioConfig, ScriptsConfig, StationConfig, TalkConfig, VADConfig
 from talk.qsolog import SessionLog
 from talk.rules import RuleEngine
 from talk.session import Session
@@ -99,7 +100,13 @@ class TestSessionReply(unittest.TestCase):
                 out=out.append,
                 transcriber=FakeTranscriber(text),
                 station=STATION,
-                rule_engine=RuleEngine(SCRIPTS, operator_name="Mark", qth="Oklahoma City"),
+                brain=Brain(
+                    rule_engine=RuleEngine(SCRIPTS, operator_name="Mark", qth="Oklahoma City"),
+                    scripts=SCRIPTS,
+                    station=STATION,
+                    claude_config=ClaudeConfig(),
+                    claude_client=None,  # rules/fallback only, matching this ticket's scope
+                ),
                 synthesizer=synth,
                 player=player,
                 transmitter=FakeTransmitter(),
@@ -117,6 +124,7 @@ class TestSessionReply(unittest.TestCase):
         )
         reply = next(r for r in records if r["event"] == "reply")
         self.assertEqual(reply["intent"], "signal_report")
+        self.assertEqual(reply["intent_source"], "rule")
         self.assertEqual(reply["text"], "Good copy on your signal.")
         self.assertFalse(reply["armed"])
         self.assertEqual(synth.calls, ["Good copy on your signal."])
@@ -127,7 +135,7 @@ class TestSessionReply(unittest.TestCase):
             "whiskey five tango sierra uniform what's the weather like"
         )
         reply = next(r for r in records if r["event"] == "reply")
-        self.assertEqual(reply["intent"], "fallback")
+        self.assertEqual(reply["intent_source"], "fallback")
         self.assertEqual(reply["text"], SCRIPTS.fallback_reply)
 
     def test_silent_utterance_gets_no_reply(self):
