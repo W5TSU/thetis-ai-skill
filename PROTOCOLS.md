@@ -3,8 +3,8 @@
 Full command inventories for the two protocols `thetisctl` speaks, generated
 directly from source rather than from memory, so this file can be diffed
 against the upstream sources and re-generated when they change. See
-`README.md` for the curated, day-to-day command tables and usage examples;
-this file is the exhaustive cross-reference behind them.
+`COMMANDS.md` for the curated, day-to-day command tables and usage
+examples; this file is the exhaustive cross-reference behind them.
 
 ## Sources
 
@@ -774,7 +774,8 @@ undispatched-but-defined codes, and re-check `internal/cat/commands.go` /
 
 ## See also
 
-- `README.md` — day-to-day command tables, usage examples, TX safety
+- `COMMANDS.md` — day-to-day command tables and usage examples
+- `README.md` — install/build, quickstart, TX safety
 - `AGENTS.md` — contributor contract, including the requirement to verify
   wire formats against Thetis's own source before changing one
 - `.claude/skills/thetis-control/SKILL.md` — the agent-facing skill that

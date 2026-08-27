@@ -1,0 +1,4 @@
+numpy
+faster-whisper
+piper-tts
+anthropic
