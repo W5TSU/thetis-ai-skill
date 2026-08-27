@@ -133,11 +133,13 @@ same as `--confirm-tx` and `THETIS_LIVE_ALLOW_TX` elsewhere in this repo.
 
 ## Child DOX Index
 
+- `COMMANDS.md` — the CAT/TCI command tables (split out of `README.md` to
+  keep that file an overview rather than a command dump); update it, not
+  `README.md`, when a command's flags or behavior change.
 - `PROTOCOLS.md` — exhaustive TCI/CAT command inventory generated from the
   upstream TCI spec and Thetis's own CAT source, with an implemented-vs-not
   breakdown; regenerate it (steps included) after a Thetis sync that touches
   CAT/TCI dispatch.
 - `NOTES.md` — real-world behavior notes and incident history (split out of
-  `README.md` to keep that a plain command reference); add to it, don't
-  duplicate back into `README.md`, when a new gotcha is confirmed against a
-  real radio.
+  `README.md` to keep that an overview); add to it, don't duplicate back
+  into `README.md`, when a new gotcha is confirmed against a real radio.

@@ -141,7 +141,8 @@ batch looks.
 
 ## See also
 
-- `README.md` — command reference and quickstart
+- `README.md` — quickstart and overview
+- `COMMANDS.md` — full CAT/TCI command reference
 - `AGENTS.md` — contributor contract; requires re-verifying wire formats
   against Thetis's own source, since these behaviors can shift when Thetis
   is synced from upstream

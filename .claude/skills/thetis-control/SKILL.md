@@ -11,7 +11,7 @@ allowed-tools: Bash, Read
 Operates `thetisctl`, a standalone Go CLI that talks to a running Thetis SDR
 instance over its existing network control protocols. No changes to Thetis
 itself are required — both servers already exist there, just usually
-disabled by default. Full command reference: [`README.md`](../../../README.md).
+disabled by default. Full command reference: [`COMMANDS.md`](../../../COMMANDS.md).
 Contributor/dev contract for this code: [`AGENTS.md`](../../../AGENTS.md).
 
 Read this whole file before issuing any command that keys the transmitter.
@@ -122,9 +122,9 @@ check with e.g. `thetisctl tci --host <radio-ip> query trx1`.
   the task needs audio or CW/TX-audio, since it's the protocol that can
   actually carry transmitted audio.
 
-Full flag/command tables for both tiers are in `README.md` — don't duplicate
-them here from memory; read that file for exact syntax before constructing a
-command you haven't used in this conversation yet.
+Full flag/command tables for both tiers are in `COMMANDS.md` — don't
+duplicate them here from memory; read that file for exact syntax before
+constructing a command you haven't used in this conversation yet.
 
 ## 3. TX safety protocol — read before any TX-capable command
 
@@ -229,7 +229,7 @@ the full contract.
 ## 5. Command index
 
 Grouped by tier; **bold** = TX-capable (needs the safety protocol above).
-Exact flags/syntax: `README.md`.
+Exact flags/syntax: `COMMANDS.md`.
 
 **CAT** (`thetisctl cat --host <ip> ...`): `freq get|set`, `mode get|set`,
 `rit`, `xit`, `split`, `agc`, `atten`, `preamp`, `band`, `power`,
