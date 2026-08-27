@@ -1,23 +1,39 @@
-"""The turn loop. This slice listens: RX events -> VAD -> logged Utterances.
+"""The turn loop. This slice listens and recognizes: RX events -> VAD ->
+transcribe -> wake match -> logged decision.
 
-Later slices grow this into the full state machine (transcribe, match,
-compose, synthesize, transmit) with the QSO/ID/session clocks.
+Later slices grow this into the full state machine (compose, synthesize,
+transmit) with the QSO/ID/session clocks.
 """
 
 from __future__ import annotations
 
-from talk.config import TalkConfig
+from talk.config import StationConfig, TalkConfig
+from talk.matcher import match as default_match
 from talk.qsolog import SessionLog
 
 
 class Session:
-    def __init__(self, cfg: TalkConfig, stream, vad, log: SessionLog, sample_rate: int, out=print):
+    def __init__(
+        self,
+        cfg: TalkConfig,
+        stream,
+        vad,
+        log: SessionLog,
+        sample_rate: int,
+        out=print,
+        transcriber=None,
+        station: StationConfig | None = None,
+        matcher=default_match,
+    ):
         self._cfg = cfg
         self._stream = stream
         self._vad = vad
         self._log = log
         self._rate = sample_rate
         self._out = out
+        self._transcriber = transcriber
+        self._station = station or cfg.station
+        self._matcher = matcher
 
     def run(self) -> int:
         """Consume the RX stream until it dies or the operator interrupts."""
@@ -48,12 +64,26 @@ class Session:
     def _on_utterance(self, u) -> None:
         duration = len(u.samples) / self._rate
         wav = self._log.write_wav("rx-utterance", u.samples, self._rate)
-        self._log.event(
-            "utterance",
-            start=round(u.start, 3),
-            duration=round(duration, 3),
-            forced_cut=u.forced_cut,
-            wav=str(wav) if wav else None,
-        )
+        fields = {
+            "start": round(u.start, 3),
+            "duration": round(duration, 3),
+            "forced_cut": u.forced_cut,
+            "wav": str(wav) if wav else None,
+        }
         cut = " (force-cut)" if u.forced_cut else ""
-        self._out(f"[{u.start:8.1f}s] utterance {duration:4.1f}s{cut}")
+        line = f"[{u.start:8.1f}s] utterance {duration:4.1f}s{cut}"
+
+        if self._transcriber is not None:
+            transcript = self._transcriber.transcribe(u.samples, self._rate)
+            decision = self._matcher(transcript.text, self._station)
+            fields.update(
+                transcript=transcript.text,
+                triggered=decision.triggered,
+                trigger_kind=decision.kind,
+                score=round(decision.score, 3),
+            )
+            status = f"triggered ({decision.kind})" if decision.triggered else "silent"
+            line += f' — "{transcript.text}" [{status}]'
+
+        self._log.event("utterance", **fields)
+        self._out(line)

@@ -128,12 +128,26 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool) -> int:
     log = SessionLog(cfg.logging.dir, enabled=cfg.logging.enabled and not no_log)
     if log.enabled:
         print(f"session log: {log.dir}")
+
+    transcriber = None
+    try:
+        from talk.transcribe import Transcriber
+
+        transcriber = Transcriber(models_dir=str(REPO_ROOT / "talk" / "models" / "whisper"))
+    except ImportError:
+        print(
+            "talk: WARNING speech-to-text unavailable (faster-whisper not installed); "
+            "listening only, no wake recognition — run talk/setup.sh",
+            file=sys.stderr,
+        )
+
     session = Session(
         cfg,
         stream=RxStream(stream_cmd),
         vad=EnergyVAD(cfg.vad, rate),
         log=log,
         sample_rate=rate,
+        transcriber=transcriber,
     )
     return session.run()
 
