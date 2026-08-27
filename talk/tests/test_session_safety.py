@@ -17,6 +17,7 @@ from talk.qsolog import SessionLog
 from talk.safety import Clocks, PreTxCheck, RadioStatus
 from talk.session import Session
 from talk.transcribe import Transcript
+from talk.transmit import TxResult
 from talk.vad import EnergyVAD
 
 RATE = 24000
@@ -92,8 +93,14 @@ class FakeTransmitter:
     def __init__(self):
         self.sent = []
 
-    def send(self, wav_path):
+    def send_async(self, wav_path):
         self.sent.append(str(wav_path))
+
+    def is_done(self):
+        return True
+
+    def result(self):
+        return TxResult(exit_code=0, saw_tx_off=True)
 
 
 class FakeClock:
@@ -286,6 +293,33 @@ class TestDisarmOnFailedPreTxCheck(unittest.TestCase):
         )
         self.assertEqual(len(transmitter.sent), 1)
         self.assertEqual(len([r for r in records if r["event"] == "disarm"]), 0)
+
+
+class TestTxAnomalyDisarm(unittest.TestCase):
+    def test_unconfirmed_unkey_disarms_after_sending(self):
+        class FlakyTransmitter:
+            def __init__(self):
+                self.sent = []
+
+            def send_async(self, wav_path):
+                self.sent.append(str(wav_path))
+
+            def is_done(self):
+                return True
+
+            def result(self):
+                return TxResult(exit_code=None, saw_tx_off=False)  # never confirmed
+
+        transmitter = FlakyTransmitter()
+        records = run_session(
+            one_utterance_events(),
+            ["whiskey five tango sierra uniform hi"],
+            armed=True,
+            transmitter=transmitter,
+        )
+        self.assertEqual(len(transmitter.sent), 1)  # it did attempt to transmit
+        disarm = next(r for r in records if r["event"] == "disarm")
+        self.assertEqual(disarm["reason"], "tx-anomaly")
 
 
 class TestSessionExpiry(unittest.TestCase):

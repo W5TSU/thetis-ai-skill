@@ -207,7 +207,13 @@ FreeDV software, to confirm.
 
 `cat ptt`, `cat tune`, `cat quickplay on`, `cat radae-sanity`, `tci tune`,
 `tci ptt`, `tci cw send`, `tci cw send-msg`, and `tci tx-audio send` can key
-the transmitter. **Every one of them defaults to a dry run** — without
+the transmitter. There is also `talk` (`talk/`, this repo's Python AI voice
+operator) — it runs in rehearsal mode by default (no TX), and transmits only
+when armed with `--armed --confirm-tx`; that flow is a bounded exception to
+the single-transmission model below, documented in
+[`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) and
+`talk/README.md`. **Every one of the CLI commands above defaults to a dry
+run** — without
 `--confirm-tx`, they print exactly what they would send and do nothing
 TX-capable:
 

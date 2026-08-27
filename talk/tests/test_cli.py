@@ -45,6 +45,26 @@ class TestCLI(unittest.TestCase):
         result = run_cli("--check")
         self.assertNotEqual(result.returncode, 0)
 
+    def test_armed_without_confirm_tx_refused(self):
+        result = run_cli("--config", str(EXAMPLE), "--armed")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("confirm-tx", result.stderr)
+
+    def test_armed_with_wrong_confirm_tx_refused(self):
+        result = run_cli("--config", str(EXAMPLE), "--armed", "--confirm-tx", "nope")
+        self.assertEqual(result.returncode, 2)
+
+    def test_armed_refuses_non_tty_before_any_radio_io(self):
+        result = subprocess.run(
+            [sys.executable, "-m", "talk", "--config", str(EXAMPLE),
+             "--armed", "--confirm-tx", "I-UNDERSTAND-THIS-KEYS-THE-RADIO"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("TTY", result.stderr)
+        # Refused before printing the arm banner or touching the network.
+        self.assertNotIn("ARMED", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

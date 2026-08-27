@@ -129,9 +129,11 @@ command you haven't used in this conversation yet.
 ## 3. TX safety protocol — read before any TX-capable command
 
 TX-capable commands: `cat ptt`, `cat quickplay on`, `cat radae-sanity`, `tci
-tune`, `tci ptt`, `tci cw send`, `tci tx-audio send`. Each of these **keys a
-real transmitter attached to a real antenna** if run for real — there is no
-simulated mode.
+tune`, `tci ptt`, `tci cw send`, `tci tx-audio send`, and `talk --armed`
+(§6 below — a Python voice-operator loop that transmits repeatedly under
+one arming action, the single sanctioned exception to the per-transmission
+rule that follows). Each of these **keys a real transmitter attached to a
+real antenna** if run for real — there is no simulated mode.
 
 **Every one of them defaults to a dry run.** Without `--confirm-tx`, they
 print exactly what would be sent and do nothing TX-capable. Always run the
@@ -145,7 +147,12 @@ frequency, mode, message content (for CW), and duration. Rules:
 
 - A general "you can control the radio" or "go ahead" earlier in the
   conversation does not carry forward to a new transmission decision. Each
-  distinct act of keying needs its own explicit go-ahead.
+  distinct act of keying needs its own explicit go-ahead. **`talk --armed`
+  (§6) is the single sanctioned exception** — one human arming action
+  authorizes a bounded session of repeated automated keyings — and even
+  that exception requires the human to run the arming command themselves;
+  an agent must never run it on their behalf, for the same reason it must
+  never set `--confirm-tx` or `THETIS_LIVE_ALLOW_TX` itself.
 - Never auto-chain a dry run's printed command straight into a
   `--confirm-tx` retry. The dry run exists so a human reads it first; treat
   it as a checkpoint, not a formality to skip past.
@@ -235,3 +242,49 @@ Exact flags/syntax: `README.md`.
 `agc`, `agc-gain`, `drive`, `power`, `rx-audio capture|stream`,
 `freedv-scan`, `query <cmd>`, **`tune`**, **`ptt`**, **`cw send`**,
 **`tx-audio send`**.
+
+**talk** (`python -m talk --config <file> ...`, this repo's `talk/`
+subtree): listens and (by default) plays would-be replies locally without
+transmitting; **`--armed --confirm-tx <phrase>`** transmits for real — see
+§6.
+
+## 6. Session-armed operation (`talk/`)
+
+`talk/` is an AI voice operator: it listens to RX audio, and when addressed
+transmits a spoken reply, repeatedly, for the duration of one armed
+session. That's a different shape of consent than every other command in
+this file, so it gets its own carve-out rather than a reinterpretation of
+§3's per-transmission rule.
+
+**Why this is allowed at all.** The bounded-session authorization here is
+sound only because every one of these holds:
+
+- **A human runs the arming command themselves, at their own terminal.**
+  `python -m talk --config ... --armed --confirm-tx <phrase>` is typed by
+  the operator. An agent must never construct or run this command, must
+  never suggest the exact flags as something to paste, and must never set
+  `--confirm-tx` for the human "to save them typing." This is the same
+  rule as `--confirm-tx`/`THETIS_LIVE_ALLOW_TX` elsewhere in this file,
+  applied to a new entry point.
+- **Rehearsal is the default.** Running `talk` without `--armed` runs the
+  full pipeline — listens, transcribes, composes, synthesizes — and plays
+  the reply on local speakers only; the radio is never keyed. Arming is an
+  additional, explicit, separately-flagged act.
+- **Any keypress or Ctrl-C kills it instantly**, aborting an in-flight
+  transmission via its own confirmed unkey (never a hard kill — see §3's
+  unkey-confirmation note) and disarming. `talk` refuses to arm without a
+  real terminal for exactly this reason.
+- **Hard budgets bound the session in code, not just prose**: at most 60
+  seconds per transmission, at most 10 minutes per conversational exchange
+  before a scripted sign-off, an overall armed-session expiry, and an
+  automatic disarm if the frequency/mode changes underneath it, the radio
+  link drops, or a transmission doesn't confirm a clean unkey. See
+  `talk/README.md` for the full list.
+
+**An agent's role around `talk` is entirely off-line from arming**: reading
+its logs, helping configure `talk/config.toml`, running it in rehearsal
+mode to test changes (never TX-capable), and referring the human to
+`talk/tests/live_armed.md` for the human-only live-fire procedure. Never
+run that procedure, never draft the arming command for the human to copy,
+and never treat an earlier "you can run talk" as authorization to arm it
+yourself.

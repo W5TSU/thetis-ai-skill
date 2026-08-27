@@ -8,6 +8,7 @@ transmit) with the QSO/ID/session clocks.
 from __future__ import annotations
 
 import tempfile
+import time
 from pathlib import Path
 
 from talk.brain import QsoContext
@@ -37,6 +38,7 @@ class Session:
         armed: bool = False,
         clocks: Clocks | None = None,
         pretx_check=None,
+        kill_switch=None,
     ):
         self._cfg = cfg
         self._stream = stream
@@ -56,11 +58,17 @@ class Session:
         self._reply_seq = 0
         self._clocks = clocks or Clocks(cfg.budgets)
         self._pretx_check = pretx_check
+        self._kill_switch = kill_switch
 
     def run(self) -> int:
         """Consume the RX stream until it dies or the operator interrupts."""
         try:
             for ev in self._stream.events():
+                if self._kill_switch is not None and self._kill_switch.triggered():
+                    self._out("KILL: stopping (keypress/interrupt)")
+                    self._log.event("kill-triggered")
+                    self._stream.stop()
+                    return 130
                 if ev.kind == "audio":
                     utterance = self._vad.feed(ev.samples)
                     if utterance is not None:
@@ -208,14 +216,39 @@ class Session:
 
         if self._armed:
             assert self._transmitter is not None, "armed session requires a transmitter"
-            self._transmitter.send(out_path)
             self._out(f'  -> TX ({source}, {duration:.1f}s): "{reply_text}"')
+            result = self._transmit_with_kill_watch(out_path)
+            if result.exit_code != 0 or not result.saw_tx_off:
+                self._armed = False
+                self._log.event(
+                    "disarm", reason="tx-anomaly",
+                    exit_code=result.exit_code, saw_tx_off=result.saw_tx_off,
+                )
+                self._out(
+                    f"WARNING: TX did not confirm a clean unkey (exit={result.exit_code}); "
+                    "disarmed — CHECK THE RADIO NOW"
+                )
             return True
         elif self._player is not None:
             self._player.play(out_path)
             self._out(f'  -> reply ({source}, {duration:.1f}s, rehearsal): "{reply_text}"')
             return True
         return False
+
+    def _transmit_with_kill_watch(self, out_path: Path):
+        """Sends without blocking so a kill switch can abort mid-transmission
+        instead of only being checked once the child finishes on its own."""
+        self._transmitter.send_async(out_path)
+        while True:
+            if self._transmitter.is_done():
+                return self._transmitter.result()
+            if self._kill_switch is not None and self._kill_switch.triggered():
+                self._out("KILL: aborting in-flight transmission (keypress/interrupt)")
+                self._log.event("kill-triggered")
+                result = self._transmitter.abort(grace_seconds=10)
+                self._armed = False
+                return result
+            time.sleep(0.05)
 
     def _close_qso(self) -> None:
         self._clocks.close_qso()
