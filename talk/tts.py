@@ -42,6 +42,30 @@ def drop_trailing_sentences(
     return " ".join(sentences)
 
 
+def synthesize_capped(
+    synthesizer, text: str, out_path: str | Path, max_seconds: float
+) -> tuple[float, bool, str]:
+    """Synthesize, then shorten and re-synthesize if the result runs long.
+
+    The common case (composed reply already under budget) costs one
+    synthesis call. Over budget, sentences are dropped from the end and the
+    remainder re-rendered; a single sentence that alone exceeds the budget
+    is left as-is and reported as refused rather than silently truncated
+    mid-word.
+    """
+    duration = synthesizer.synthesize(text, out_path)
+    if duration <= max_seconds:
+        return duration, False, text
+
+    def estimate(sentence: str) -> float:
+        probe = str(out_path) + ".probe.wav"
+        return synthesizer.synthesize(sentence, probe)
+
+    shortened = drop_trailing_sentences(text, estimate, max_seconds)
+    duration = synthesizer.synthesize(shortened, out_path)
+    return duration, duration > max_seconds, shortened
+
+
 class Synthesizer:
     def __init__(self, model_path: str):
         from piper import PiperVoice  # deferred: heavy, optional at import time

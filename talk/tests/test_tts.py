@@ -10,7 +10,43 @@ import tempfile
 import unittest
 import wave
 
-from talk.tts import TX_RATE, drop_trailing_sentences
+from talk.tts import TX_RATE, drop_trailing_sentences, synthesize_capped
+
+
+class FakeSynth:
+    """1.0s per word, so callers can predict duration from text length."""
+
+    def __init__(self):
+        self.calls = []
+
+    def synthesize(self, text, out_path):
+        self.calls.append(text)
+        return float(len(text.split()))
+
+
+class TestSynthesizeCapped(unittest.TestCase):
+    def test_under_budget_synthesizes_once(self):
+        synth = FakeSynth()
+        duration, refused, final_text = synthesize_capped(synth, "one two three", "/tmp/x.wav", 60)
+        self.assertEqual(duration, 3.0)
+        self.assertFalse(refused)
+        self.assertEqual(final_text, "one two three")
+        self.assertEqual(len(synth.calls), 1)
+
+    def test_over_budget_drops_sentences_and_resynthesizes(self):
+        synth = FakeSynth()
+        text = "one two three. four five six seven eight nine ten eleven twelve."
+        duration, refused, final_text = synthesize_capped(synth, text, "/tmp/x.wav", 5)
+        self.assertFalse(refused)
+        self.assertLessEqual(duration, 5)
+        self.assertIn("one two three.", final_text)
+        self.assertNotIn("twelve", final_text)
+
+    def test_single_sentence_over_budget_is_refused(self):
+        synth = FakeSynth()
+        text = "one two three four five six seven eight nine ten eleven twelve."
+        duration, refused, final_text = synthesize_capped(synth, text, "/tmp/x.wav", 5)
+        self.assertTrue(refused)
 
 
 class TestTruncationHelper(unittest.TestCase):

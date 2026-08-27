@@ -125,9 +125,9 @@ class TestSessionReply(unittest.TestCase):
         reply = next(r for r in records if r["event"] == "reply")
         self.assertEqual(reply["intent"], "signal_report")
         self.assertEqual(reply["intent_source"], "rule")
-        self.assertEqual(reply["text"], "Good copy on your signal.")
+        self.assertIn("Good copy on your signal.", reply["text"])  # ID is prepended on first TX (ticket 6)
         self.assertFalse(reply["armed"])
-        self.assertEqual(synth.calls, ["Good copy on your signal."])
+        self.assertEqual(synth.calls, ["id Good copy on your signal."])  # ID prepended on first TX (ticket 6)
         self.assertEqual(len(player.played), 1)
 
     def test_unmatched_addressed_utterance_uses_fallback(self):
@@ -136,7 +136,7 @@ class TestSessionReply(unittest.TestCase):
         )
         reply = next(r for r in records if r["event"] == "reply")
         self.assertEqual(reply["intent_source"], "fallback")
-        self.assertEqual(reply["text"], SCRIPTS.fallback_reply)
+        self.assertIn(SCRIPTS.fallback_reply, reply["text"])  # ID is prepended on first TX (ticket 6)
 
     def test_silent_utterance_gets_no_reply(self):
         records, out, synth, player = self._run("just passing chatter on the band")

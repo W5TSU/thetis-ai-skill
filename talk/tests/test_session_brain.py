@@ -118,7 +118,7 @@ class TestSessionBrainWiring(unittest.TestCase):
                 records += [json.loads(l) for l in (p / "session.jsonl").read_text().splitlines()]
             reply = next(r for r in records if r["event"] == "reply")
             self.assertEqual(reply["intent_source"], "claude")
-            self.assertEqual(reply["text"], "Sure thing.")
+            self.assertIn("Sure thing.", reply["text"])  # ID is prepended on first TX (ticket 6)
 
     def test_qso_context_accumulates_across_turns_in_one_run(self):
         with tempfile.TemporaryDirectory() as tmp:
