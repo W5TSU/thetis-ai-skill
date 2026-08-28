@@ -34,6 +34,13 @@ STATION = StationConfig(
 @dataclass
 class FakeMessage:
     text: str
+    type: str = "text"
+
+
+@dataclass
+class FakeThinkingBlock:
+    thinking: str = "let me think"
+    type: str = "thinking"
 
 
 @dataclass
@@ -158,6 +165,35 @@ class TestClaudeFallthrough(unittest.TestCase):
         messages = api.calls[0]["messages"]
         # 2 turns kept = 4 messages (heard/reply pairs) + the new heard message.
         self.assertEqual(len(messages), 5)
+
+
+@unittest.skipUnless(HAS_ANTHROPIC, "needs the anthropic package installed")
+class TestThinkingBlocks(unittest.TestCase):
+    """Claude 5 responses lead with a thinking block; _ask_claude must reach
+    past it to the text block rather than reading content[0] blindly."""
+
+    class _API:
+        def __init__(self, blocks):
+            self._blocks = blocks
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            return FakeResponse(content=self._blocks)
+
+    def test_reads_text_block_after_a_leading_thinking_block(self):
+        api = self._API([FakeThinkingBlock(), FakeMessage(text="Bands sound open.")])
+        brain = make_brain(FakeClient(messages_api=api))
+        decision = brain.compose("how are the bands", QsoContext())
+        self.assertEqual(decision.source, "claude")
+        self.assertEqual(decision.reply_text, "Bands sound open.")
+
+    def test_thinking_only_response_falls_back(self):
+        api = self._API([FakeThinkingBlock()])
+        brain = make_brain(FakeClient(messages_api=api))
+        decision = brain.compose("how are the bands", QsoContext())
+        self.assertEqual(decision.source, "fallback")
+        self.assertEqual(decision.reply_text, SCRIPTS.fallback_reply)
 
 
 class TestDegradation(unittest.TestCase):
