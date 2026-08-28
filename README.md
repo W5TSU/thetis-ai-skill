@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**thetisctl** igives remote control of a running Thetis SDR instance over its
+**thetisctl** provides remote control of a running Thetis SDR instance over its
 existing network using CAT-over-TCP (frequency, mode, filters, VFO,
 RIT/XIT, split, AGC, attenuator/preamp, band) and TCI-over-WebSocket (the
 same controls plus RX/TX audio streaming, CW keying, and transmit). 
@@ -32,7 +32,7 @@ it — it assumes `thetisctl` is already built and on `PATH` (below).
 
 ## Build
 
-Prebuilt Linux/Windows/macOS (amd64+arm64) binaries publish to
+Prebuilt Linux/Windows/macOS (amd64+arm64) binaries are published to
 [Releases](https://github.com/W5TSU/thetis-ai-skill/releases/latest) on every `v*` tag, alongside a `SHA256SUMS` file — or build from source (Go
 1.22+, pure Go, no cgo, no dependencies):
 
