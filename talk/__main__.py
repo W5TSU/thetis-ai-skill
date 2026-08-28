@@ -29,6 +29,7 @@ import tempfile
 import wave
 from pathlib import Path
 
+from talk import __version__
 from talk import config as config_mod
 from talk.audio_rx import RxStream
 from talk.brain import Brain
@@ -46,6 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="talk", description="AI voice operator for a Thetis station")
+    p.add_argument("--version", action="version", version=f"talk {__version__}")
     p.add_argument("--config", required=True, help="path to station config TOML")
     p.add_argument("--check", action="store_true", help="validate config, print banner, exit")
     p.add_argument("--no-log", action="store_true", help="disable session logging")
@@ -57,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
 def banner(cfg: config_mod.TalkConfig, armed: bool) -> str:
     mode = "ARMED — WILL TRANSMIT" if armed else "REHEARSAL MODE — radio will not be keyed"
     lines = [
-        f"talk — AI voice operator  [{mode}]",
+        f"talk {__version__} — AI voice operator  [{mode}]",
         f"  station : {cfg.station.callsign} ({cfg.station.operator_name or 'operator unnamed'})",
         f"  radio   : {cfg.radio.host}  cat:{cfg.radio.cat_port} tci:{cfg.radio.tci_port}  rx{cfg.radio.rx} @ {cfg.radio.sample_rate} Hz",
         f"  wakes   : {' '.join(cfg.station.phonetic_words)} | {', '.join(cfg.station.wake_names) or '(none)'}",

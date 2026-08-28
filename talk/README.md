@@ -1,5 +1,7 @@
 # Talk — an AI voice operator for the station
 
+**Version 0.1.0** (`python -m talk --version`).
+
 An AI that can *hear voice over the radio and respond by voice over the
 radio* — an AI radio operator, supervised by a human control operator. All
 eight implementation slices below have landed and are covered by the

@@ -5,6 +5,11 @@ Every command `thetisctl` currently implements, by protocol tier. See
 safety protocol; see [`PROTOCOLS.md`](PROTOCOLS.md) for the full universe of
 commands each protocol *defines*, including the ones not wired here yet.
 
+Two commands take no protocol: `thetisctl help` prints usage, and
+`thetisctl version` (also `-v` / `--version`) prints `thetisctl 0.1.0` —
+this CLI's own release version, distinct from the `cat version` command
+below, which reports the version of the Thetis software it's talking to.
+
 ## CAT commands — control only (`thetisctl cat ...`)
 
 | Command | Effect |

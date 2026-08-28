@@ -75,7 +75,8 @@ bare command, so it must resolve on `PATH` for whichever user/agent runs it.
 Re-run the relevant step after downloading a new release or rebuilding from
 source in place (the symlink target stays valid; only needed once per
 binary location). Confirm with `which thetisctl` (`Get-Command thetisctl`
-on Windows) and `thetisctl help`.
+on Windows), `thetisctl help`, and `thetisctl version` (this skill targets
+`thetisctl 0.1.0`).
 
 **Installing the skill itself.** This `.claude/skills/thetis-control/`
 directory is a self-contained Claude Code skill. To make it available in

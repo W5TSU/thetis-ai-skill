@@ -9,6 +9,10 @@ import (
 	"os"
 )
 
+// version is thetisctl's own release version, independent of the Thetis
+// software version reported by `thetisctl cat version`.
+const version = "0.1.0"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -21,6 +25,9 @@ func main() {
 		err = runCAT(os.Args[2:])
 	case "tci":
 		err = runTCI(os.Args[2:])
+	case "version", "-v", "--version":
+		fmt.Println("thetisctl", version)
+		return
 	case "help", "-h", "--help":
 		usage()
 		return
@@ -44,6 +51,7 @@ trusted LAN, never the internet.
 Usage:
   thetisctl cat --host <ip> [--port 13013] [--timeout 3s] <command> [args...]
   thetisctl tci --host <ip> [--port 50001] [--timeout 5s] <command> [args...]
+  thetisctl version                (print thetisctl's own version and exit)
 
 CAT commands (control-only, Tier 1):
   freq get A|B                    freq set A|B <hz>
