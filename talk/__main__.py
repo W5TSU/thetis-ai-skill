@@ -26,7 +26,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import wave
 from pathlib import Path
 
 from talk import __version__
@@ -34,6 +33,7 @@ from talk import config as config_mod
 from talk.audio_rx import RxStream
 from talk.brain import Brain
 from talk.constants import CONFIRM_PHRASE, ID_INTERVAL_SECONDS
+from talk.dsp import wav_sample_rate
 from talk.keywatch import KillSwitch
 from talk.qsolog import SessionLog
 from talk.rules import RuleEngine
@@ -114,7 +114,9 @@ def probe_sample_rate(cfg: config_mod.TalkConfig, ctl: str) -> int:
 
     The stream's stdout carries no rate metadata, but a capture WAV's header
     is written from the authoritative TCI frame headers — so a 1s probe
-    capture tells us the real rate to run the VAD and resampler at.
+    capture tells us the real rate to run the VAD and resampler at. The
+    capture is an IEEE-float WAV, which stdlib `wave` can't read, so the
+    header is parsed directly (see `dsp.wav_sample_rate`).
     """
     tci = [ctl, "tci", "--host", cfg.radio.host, "--port", str(cfg.radio.tci_port)]
     subprocess.run(
@@ -131,8 +133,7 @@ def probe_sample_rate(cfg: config_mod.TalkConfig, ctl: str) -> int:
         capture_output=True,
         timeout=30,
     )
-    with wave.open(probe) as w:
-        actual = w.getframerate()
+    actual = wav_sample_rate(probe)
     os.unlink(probe)
     if actual != cfg.radio.sample_rate:
         print(
