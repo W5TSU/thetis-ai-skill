@@ -9,8 +9,16 @@ import pathlib
 import tempfile
 import unittest
 import wave
+from array import array
 
-from talk.tts import TX_RATE, drop_trailing_sentences, synthesize_capped
+from talk.tts import (
+    LEAD_SILENCE_MS,
+    TRAIL_SILENCE_MS,
+    TX_RATE,
+    _with_silence,
+    drop_trailing_sentences,
+    synthesize_capped,
+)
 
 
 class FakeSynth:
@@ -49,6 +57,23 @@ class TestSynthesizeCapped(unittest.TestCase):
         self.assertTrue(refused)
 
 
+class TestSilencePadding(unittest.TestCase):
+    def test_brackets_pcm_with_lead_and_trail_silence(self):
+        body = array("h", [6000, -6000, 6000, -6000])
+        out = _with_silence(body)
+        n_lead = round(TX_RATE * LEAD_SILENCE_MS / 1000)
+        n_trail = round(TX_RATE * TRAIL_SILENCE_MS / 1000)
+        self.assertEqual(len(out), n_lead + len(body) + n_trail)
+        self.assertEqual(set(out[:n_lead]), {0})
+        self.assertEqual(set(out[-n_trail:]), {0})
+        self.assertEqual(list(out[n_lead : n_lead + len(body)]), list(body))
+
+    def test_empty_body_is_all_silence(self):
+        out = _with_silence(array("h"))
+        self.assertGreater(len(out), 0)
+        self.assertEqual(set(out), {0})
+
+
 class TestTruncationHelper(unittest.TestCase):
     def test_drops_last_sentence_when_over_budget(self):
         text = "First sentence here. Second sentence here. Third sentence here."
@@ -85,6 +110,14 @@ class TestRealPiper(unittest.TestCase):
                 self.assertEqual(w.getnchannels(), 1)
                 self.assertEqual(w.getsampwidth(), 2)
                 self.assertAlmostEqual(w.getnframes() / TX_RATE, duration, delta=0.2)
+                frames = array("h")
+                frames.frombytes(w.readframes(w.getnframes()))
+            # Silence brackets the speech so ALSA/PTT don't clip a syllable.
+            head = round(TX_RATE * LEAD_SILENCE_MS / 1000)
+            tail = round(TX_RATE * TRAIL_SILENCE_MS / 1000)
+            self.assertEqual(set(frames[: head // 2]), {0})
+            self.assertEqual(set(frames[-(tail // 2) :]), {0})
+            self.assertTrue(any(abs(s) > 100 for s in frames))  # speech present
 
 
 if __name__ == "__main__":

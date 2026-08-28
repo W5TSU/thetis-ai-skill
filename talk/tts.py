@@ -18,6 +18,20 @@ from talk.dsp import resample
 
 TX_RATE = 48000
 
+# Bracket every rendered clip with silence: `aplay` drops the first/last
+# audio period while the device wakes and closes, and on TX the same edges
+# get clipped as PTT keys and unkeys. Also just better operating practice.
+LEAD_SILENCE_MS = 300
+TRAIL_SILENCE_MS = 500
+
+
+def _with_silence(body: array) -> array:
+    """Prepend LEAD_SILENCE_MS and append TRAIL_SILENCE_MS of 16-bit
+    silence to a mono PCM buffer at TX_RATE."""
+    lead = array("h", bytes(2 * round(TX_RATE * LEAD_SILENCE_MS / 1000)))
+    trail = array("h", bytes(2 * round(TX_RATE * TRAIL_SILENCE_MS / 1000)))
+    return lead + body + trail
+
 
 def drop_trailing_sentences(
     text: str,
@@ -83,12 +97,12 @@ class Synthesizer:
         if native_rate is None:
             native_rate = TX_RATE  # nothing synthesized; write a silent stub
         resampled = resample(pcm, native_rate, TX_RATE)
-        pcm16 = array(
-            "h", (max(-32768, min(32767, int(s * 32767))) for s in resampled)
+        pcm16 = _with_silence(
+            array("h", (max(-32768, min(32767, int(s * 32767))) for s in resampled))
         )
         with wave.open(str(out_path), "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(TX_RATE)
             w.writeframes(pcm16.tobytes())
-        return len(resampled) / TX_RATE
+        return len(pcm16) / TX_RATE
