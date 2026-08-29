@@ -14,6 +14,11 @@ and debug hook at the Radio seam; when set, no thetisctl startup calls are
 made for RX and the configured sample rate is trusted as-is. It has no
 effect on arming: transmission and radio-state polling always go through
 the real thetisctl.
+
+TALK_PLAYER_CMD (env) replaces the local rehearsal playback command
+(default `aplay -q`) — split on whitespace, the reply WAV path is appended.
+For boxes without ALSA `aplay` (e.g. `paplay`, `afplay`) and for tests that
+need playback silenced. Rehearsal only; arming transmits, never plays.
 """
 
 from __future__ import annotations
@@ -26,7 +31,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import wave
 from pathlib import Path
 
 from talk import __version__
@@ -34,6 +38,7 @@ from talk import config as config_mod
 from talk.audio_rx import RxStream
 from talk.brain import Brain
 from talk.constants import CONFIRM_PHRASE, ID_INTERVAL_SECONDS
+from talk.dsp import wav_sample_rate
 from talk.keywatch import KillSwitch
 from talk.qsolog import SessionLog
 from talk.rules import RuleEngine
@@ -98,6 +103,13 @@ def main(argv: list[str] | None = None) -> int:
     return listen(cfg, no_log=args.no_log, armed=args.armed)
 
 
+def player_from_env() -> Player:
+    """Rehearsal playback command: TALK_PLAYER_CMD (whitespace-split) if set,
+    else the built-in default. The reply WAV path is appended per play."""
+    cmd = os.environ.get("TALK_PLAYER_CMD")
+    return Player(shlex.split(cmd)) if cmd else Player()
+
+
 def thetisctl_path() -> str:
     found = shutil.which("thetisctl")
     if found:
@@ -114,7 +126,9 @@ def probe_sample_rate(cfg: config_mod.TalkConfig, ctl: str) -> int:
 
     The stream's stdout carries no rate metadata, but a capture WAV's header
     is written from the authoritative TCI frame headers — so a 1s probe
-    capture tells us the real rate to run the VAD and resampler at.
+    capture tells us the real rate to run the VAD and resampler at. The
+    capture is an IEEE-float WAV, which stdlib `wave` can't read, so the
+    header is parsed directly (see `dsp.wav_sample_rate`).
     """
     tci = [ctl, "tci", "--host", cfg.radio.host, "--port", str(cfg.radio.tci_port)]
     subprocess.run(
@@ -131,8 +145,7 @@ def probe_sample_rate(cfg: config_mod.TalkConfig, ctl: str) -> int:
         capture_output=True,
         timeout=30,
     )
-    with wave.open(probe) as w:
-        actual = w.getframerate()
+    actual = wav_sample_rate(probe)
     os.unlink(probe)
     if actual != cfg.radio.sample_rate:
         print(
@@ -282,7 +295,7 @@ def listen(cfg: config_mod.TalkConfig, no_log: bool, armed: bool = False) -> int
             transcriber=transcriber,
             brain=brain,
             synthesizer=synthesizer,
-            player=Player(),
+            player=player_from_env(),
             transmitter=transmitter,
             armed=armed,
             clocks=Clocks(cfg.budgets),

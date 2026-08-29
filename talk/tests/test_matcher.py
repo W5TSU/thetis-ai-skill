@@ -40,6 +40,21 @@ class TestPhoneticCallsign(unittest.TestCase):
         text = "whiskey is nice and so is a number like five but mostly I dance the tango"
         self.assertFalse(match(text, STATION).triggered)
 
+    def test_later_fuzzy_match_does_not_block_earlier_words(self):
+        # "give" ~ "five" at exactly WORD_RATIO; a greedy scan matches it,
+        # advances past tango/uniform, and drops to 2 hits. The real callsign
+        # words are all present and in order.
+        m = match("whiskey tango uniform please give me your location over", STATION)
+        self.assertTrue(m.triggered)
+        self.assertEqual(m.kind, "callsign")
+
+    def test_full_callsign_with_give_in_the_message_triggers(self):
+        m = match(
+            "whiskey five tango sierra uniform please give me your location over",
+            STATION,
+        )
+        self.assertTrue(m.triggered)
+
     def test_empty_text(self):
         self.assertFalse(match("", STATION).triggered)
 

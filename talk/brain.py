@@ -110,4 +110,10 @@ class Brain:
             )
         except anthropic.APIError:
             return None
-        return response.content[0].text.strip()
+        # Claude 5 models lead with a thinking block; take the first text
+        # block, not content[0]. No text block at all -> fall back.
+        text = next(
+            (b.text for b in response.content if getattr(b, "type", None) == "text"),
+            None,
+        )
+        return text.strip() if text else None

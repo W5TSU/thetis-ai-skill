@@ -121,6 +121,24 @@ incident showed a bare fire-and-forget unkey can silently fail; see
 additionally hard-caps total on-time at 5 seconds no matter what `--hold`
 requests.
 
+### Example: an agent turning "call CQ" into a command
+
+The agent's job here is to translate the operator's instruction into the
+exact **dry-run** command and show its output. The operator reads that, then
+re-runs it with `--confirm-tx=I-UNDERSTAND-THIS-KEYS-THE-RADIO` appended —
+the agent never adds the confirm phrase itself.
+
+**CW.** Operator: *"Call CQ on CW — `CQ CQ DE W5TSU K` at 18 WPM, CW upper sideband, on the current VFO."*  The agent runs:
+
+```bash
+./thetisctl tci --host 192.168.1.50 cw send 0 "CQ CQ DE W5TSU K" --speed 18 --mode cwu
+```
+```
+[dry-run] would send: modulation:0,cwu; cw_macros_speed:18; cw_macros:0,CQ CQ DE W5TSU K;
+(Thetis keys PTT itself while sending; completion is detected by polling PTT state, hard-capped at 1m30s)
+Pass --confirm-tx=I-UNDERSTAND-THIS-KEYS-THE-RADIO to actually transmit this message.
+```
+
 ## Live tests
 
 `go test ./...` only runs unit tests. Round-tripping every command against a real Thetis instance needs the `live` build tag and a few env vars — see
@@ -147,7 +165,7 @@ Wire formats were confirmed by reading Thetis's own source, not just protocol do
 
 ## talk — AI voice operator
 
-`talk/` is a separate Python subsystem (version 0.1.0), not part of `thetisctl` itself: an AI that hears voice over the radio and answers back over the radio, on analog SSB/FM, while a human operator supervises. It drives `thetisctl` as a child process for every radio interaction — the Go tool above needs no changes to support it. Full design, glossary, and status live in [`talk/README.md`](talk/README.md); this section is the quick-start. `python -m talk --version` prints it.
+`talk/` is a separate Python subsystem (version 0.1.0), not part of `thetisctl` itself: an AI that hears voice over the radio and answers back over the radio, on analog SSB/FM, while a human operator supervises. It drives `thetisctl` as a child process for every radio interaction — the Go tool above needs no changes to support it. Full design, glossary, and status live in [`talk/README.md`](talk/README.md); a step-by-step setup walkthrough (install → config → off-air testing → on-air) is in [`USERS-INSTRUCTIONS.md`](USERS-INSTRUCTIONS.md); this section is the quick-start. `python -m talk --version` prints it.
 
 **Two modes, one flag.** Plain `python -m talk --config talk/config.toml` runs **rehearsal mode**: it listens continuously, transcribes locally (faster-whisper), recognizes when it's been addressed (a fuzzy match on your phonetic callsign or a configured wake word), composes a reply (canned rules first, Claude for anything else), synthesizes it (Piper), and plays it on your local speakers. The radio is never keyed. Adding `--armed --confirm-tx I-UNDERSTAND-THIS-KEYS-THE-RADIO` transmits for real instead — see [`SKILL.md`'s §6](.claude/skills/thetis-control/SKILL.md) for the safety model this depends on before ever using it. **Only a human operator, at their own terminal, should ever run the armed form** — never an agent.
 
@@ -164,3 +182,22 @@ $EDITOR config.toml                     # radio host, your callsign/phonetics, s
 Prerequisites: both Thetis servers enabled and reachable — CAT (`13013`) for radio-state polling, TCI (`50001`) for audio and (when armed) transmit — same as the rest of this README's ["Enabling the servers in Thetis"](#enabling-the-servers-in-thetis). An `ANTHROPIC_API_KEY` in the environment enables the Claude half of the brain; without it, `talk` runs rules-only and says so at startup.
 
 **Tuning before ever arming:** run rehearsal mode against the real radio (RX-only, always safe) and watch how reliably it endpoints utterances and recognizes your callsign against real band noise before considering an armed session. `[vad]` in `config.toml` — `threshold_ratio`, `hangover_ms`, `min_utterance_ms` — is what to adjust: a `threshold_ratio` that's too low makes band noise trigger false utterances; too high and the leading syllable of real speech gets clipped before onset confirms. The session log's JSONL records every utterance's duration, transcript, and trigger score — use that to see what's actually being detected before adjusting thresholds blind. `talk/tests/live_armed.md` is the human-only procedure for the first armed session, once rehearsal behaves well.
+
+**Calling CQ by voice.** `talk` only answers when addressed — it never calls CQ — so an unattended voice CQ is a `tx-audio send` of a pre-rendered WAV.  Operator: *"Call CQ by voice: 'CQ CQ, this is W5TSU calling CQ and standing by.'"*  
+The agent renders the phrase to a TX-ready 48 kHz mono 16-bit WAV (what [`talk/tts.py`](talk/tts.py)'s `Synthesizer` produces, once `talk/setup.sh` has built the venv), then dry-runs the send:
+
+```bash
+talk/.venv/bin/python -c "from talk.tts import Synthesizer; \
+  Synthesizer('talk/models/piper/en_US-lessac-medium.onnx').synthesize( \
+  'CQ CQ, this is W5TSU calling CQ and standing by.', 'cq.wav')"
+./thetisctl tci --host 192.168.1.50 tx-audio send 0 --file cq.wav --max-duration 15s
+```
+
+```
+[dry-run] would send: trx:0,true,tci; then stream 4.56s of TX audio from cq.wav
+  (48000 Hz, 1 ch, peak 0.999) as int16 frames; then trx:0,false,tci;
+Pass --confirm-tx=I-UNDERSTAND-THIS-KEYS-THE-RADIO to actually transmit this audio.
+```
+
+Confirm `mode` is a voice mode (`USB`/`LSB`/`FM`) and `split` is off before
+the operator keys either one for real.

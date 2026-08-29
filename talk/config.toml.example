@@ -42,7 +42,7 @@ min_utterance_ms = 400   # discard shorter blips (static crashes)
 max_utterance_seconds = 30  # force-cut longer utterances
 
 [claude]
-model = "claude-opus-5"  # reply-composition model (needs ANTHROPIC_API_KEY)
+model = "claude-sonnet-5"  # reply-composition model (needs ANTHROPIC_API_KEY)
 max_context_turns = 12   # QSO turns remembered per contact
 timeout_seconds = 20     # API timeout before falling back to rules
 

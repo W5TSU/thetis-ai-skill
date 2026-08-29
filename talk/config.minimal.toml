@@ -1,0 +1,29 @@
+# talk — minimal station config. Copy to config.toml and edit the values.
+#
+# Only the five keys marked (required) below are needed. Everything else
+# (RX/audio ports, VAD thresholds, QSO/session budgets, logging) has a sane
+# default — see config.toml.example for the full annotated list, and
+# override any of it by adding the matching [section] here.
+
+[radio]
+host = "192.168.1.50"        # (required) address of the PC running Thetis
+
+[station]
+callsign = "W5TSU"           # (required) transmissions go out under this call
+# (required) your callsign in spoken phonetics — the words people will
+# actually say on the air, for the fuzzy wake matcher:
+phonetic_words = ["whiskey", "five", "tango", "sierra", "uniform"]
+operator_name = "Mark"       # used in spoken name/QTH replies
+qth = "Oklahoma City, Oklahoma"
+
+[scripts]
+# (required) station identification, sent on the regulatory schedule:
+id_text = "This is W5TSU, automated voice assistant."
+# (required) sent when a QSO hits its time cap or the session ends:
+signoff = "Thanks for the contact. W5TSU clear."
+
+[claude]
+# The conversational "AI reply" brain. Needs ANTHROPIC_API_KEY in the
+# environment; without it talk answers from its canned rules only. Drop
+# this whole section to accept the default model.
+model = "claude-sonnet-5"

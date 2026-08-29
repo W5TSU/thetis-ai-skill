@@ -36,15 +36,39 @@ def _similar(a: str, b: str) -> float:
 
 
 def _callsign_hits(window: list[str], phonetics: tuple[str, ...]) -> list[str]:
-    """Greedy in-order matching of phonetic words against a token window."""
-    hits = []
-    i = 0
-    for word in phonetics:
-        for j in range(i, len(window)):
-            if _similar(window[j], word) >= WORD_RATIO:
-                hits.append(word)
-                i = j + 1
-                break
+    """Longest in-order subsequence of phonetic words that fuzzy-match window
+    tokens (an LCS under difflib similarity).
+
+    A greedy scan advances its cursor past the first token clearing
+    WORD_RATIO, so a loose late match — "give" ~ "five" sits exactly on the
+    threshold — consumes the "five" slot and strands the tango/sierra/uniform
+    that came before it. The LCS keeps whichever combination yields the most
+    words in order.
+    """
+    n, m = len(phonetics), len(window)
+    dp = [[0] * (m + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            skip = dp[i - 1][j] if dp[i - 1][j] >= dp[i][j - 1] else dp[i][j - 1]
+            take = (
+                dp[i - 1][j - 1] + 1
+                if _similar(window[j - 1], phonetics[i - 1]) >= WORD_RATIO
+                else 0
+            )
+            dp[i][j] = skip if skip >= take else take
+
+    hits: list[str] = []
+    i, j = n, m
+    while i > 0 and j > 0:
+        if dp[i][j] == dp[i - 1][j]:
+            i -= 1
+        elif dp[i][j] == dp[i][j - 1]:
+            j -= 1
+        else:
+            hits.append(phonetics[i - 1])
+            i -= 1
+            j -= 1
+    hits.reverse()
     return hits
 
 
